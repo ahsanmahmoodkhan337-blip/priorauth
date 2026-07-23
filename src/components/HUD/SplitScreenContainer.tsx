@@ -29,6 +29,12 @@ import DOIComplaint from '@/components/HUD/DOIComplaint';
 import FHIRClient from '@/components/HUD/FHIRClient';
 import RevenuePrioritizer from '@/components/HUD/RevenuePrioritizer';
 import P2PCalendar from '@/components/HUD/P2PCalendar';
+import PredictiveDenial from '@/components/HUD/PredictiveDenial';
+import ICD10Booster from '@/components/HUD/ICD10Booster';
+import EHRWriteBack from '@/components/HUD/EHRWriteBack';
+import OmniSubmission from '@/components/HUD/OmniSubmission';
+import P2PWhisper from '@/components/HUD/P2PWhisper';
+import CMSEnforcer from '@/components/HUD/CMSEnforcer';
 
 // ---------------------------------------------------------------------------
 // Types — mirrored from the evaluation engine & API
@@ -136,6 +142,15 @@ export default function SplitScreenContainer() {
   const [isFHIRClientOpen, setIsFHIRClientOpen] = useState(false);
   const [isRevenuePrioritizerOpen, setIsRevenuePrioritizerOpen] = useState(false);
   const [isP2PCalendarOpen, setIsP2PCalendarOpen] = useState(false);
+
+  // ---- Workload Slayers State -----------------------------------------------
+  const [isWorkloadSlayersExpanded, setIsWorkloadSlayersExpanded] = useState(false);
+  const [isPredictiveDenialOpen, setIsPredictiveDenialOpen] = useState(false);
+  const [isICD10BoosterOpen, setIsICD10BoosterOpen] = useState(false);
+  const [isEHRWriteBackOpen, setIsEHRWriteBackOpen] = useState(false);
+  const [isOmniSubmissionOpen, setIsOmniSubmissionOpen] = useState(false);
+  const [isP2PWhisperOpen, setIsP2PWhisperOpen] = useState(false);
+  const [isCMSEnforcerOpen, setIsCMSEnforcerOpen] = useState(false);
 
   // ---- Handlers -----------------------------------------------------------
 
@@ -374,6 +389,28 @@ export default function SplitScreenContainer() {
                 <>
                   {/* Score Gauge */}
                   <ScoreGauge score={score} riskLevel={riskLevel} />
+
+                  {/* Predictive Denial — Quick-Access Mini Card */}
+                  <button
+                    onClick={() => setIsPredictiveDenialOpen(true)}
+                    className="w-full rounded-xl border-2 border-status-red/20 bg-status-red/3 p-3
+                               hover:border-status-red/40 hover:bg-status-red/5 transition-all duration-200 text-left group"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">🔮</span>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-[11px] font-bold text-text-primary group-hover:text-status-red transition-colors">
+                          Predictive Denial Risk Analysis
+                        </span>
+                        <p className="text-[9px] text-text-secondary mt-0.5">
+                          ML-powered risk scan against {payerName || 'payer'} policy — identify weakness flags before submission
+                        </p>
+                      </div>
+                      <span className="text-[9px] font-bold text-status-red px-2 py-0.5 rounded-full bg-status-red/10 flex-shrink-0">
+                        SCAN →
+                      </span>
+                    </div>
+                  </button>
 
                   {/* Criteria Checklist */}
                   <CriteriaChecklist
@@ -757,6 +794,130 @@ export default function SplitScreenContainer() {
                   </div>
                 </div>
               </div>
+
+              {/* ---- ⚡ Workload Slayers ---- */}
+              <div className="border-t border-border-light mt-2 pt-2">
+                <button
+                  onClick={() => setIsWorkloadSlayersExpanded((prev) => !prev)}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg
+                             hover:bg-accent-gold/5 transition-colors duration-200 group"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="p-1 rounded bg-accent-gold/10">
+                      <span className="text-sm">⚡</span>
+                    </div>
+                    <span className="text-xs font-semibold text-text-primary">
+                      ⚡ Workload Slayers — Denial Prevention Suite
+                    </span>
+                  </div>
+                  {isWorkloadSlayersExpanded ? (
+                    <ChevronUp size={14} className="text-text-secondary group-hover:text-text-primary transition-colors" />
+                  ) : (
+                    <ChevronDown size={14} className="text-text-secondary group-hover:text-text-primary transition-colors" />
+                  )}
+                </button>
+
+                {/* Expandable Grid */}
+                <div
+                  className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                    isWorkloadSlayersExpanded ? 'max-h-[1400px] opacity-100 mt-2' : 'max-h-0 opacity-0'
+                  }`}
+                >
+                  <div className="px-3 pb-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      {/* Slayer 1: Predictive Denial */}
+                      <button
+                        onClick={() => setIsPredictiveDenialOpen(true)}
+                        className="rounded-lg border border-status-red/20 bg-status-red/3 p-2.5 text-left
+                                   hover:border-status-red/40 hover:bg-status-red/5 transition-all duration-200 group"
+                      >
+                        <span className="text-base">🔮</span>
+                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
+                          Predictive Denial Risk Engine
+                        </p>
+                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
+                          ML denial probability + weakness flags
+                        </p>
+                      </button>
+
+                      {/* Slayer 2: ICD-10 Booster */}
+                      <button
+                        onClick={() => setIsICD10BoosterOpen(true)}
+                        className="rounded-lg border border-accent-blue/20 bg-accent-blue/3 p-2.5 text-left
+                                   hover:border-accent-blue/40 hover:bg-accent-blue/5 transition-all duration-200 group"
+                      >
+                        <span className="text-base">🎯</span>
+                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
+                          ICD-10 Specificity Booster
+                        </p>
+                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
+                          Auto-upgrade codes + CPT modifiers
+                        </p>
+                      </button>
+
+                      {/* Slayer 3: EHR Write-Back */}
+                      <button
+                        onClick={() => setIsEHRWriteBackOpen(true)}
+                        className="rounded-lg border border-accent-blue/20 bg-accent-blue/3 p-2.5 text-left
+                                   hover:border-accent-blue/40 hover:bg-accent-blue/5 transition-all duration-200 group"
+                      >
+                        <span className="text-base">📤</span>
+                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
+                          EHR InBasket Write-Back
+                        </p>
+                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
+                          Push addendum to Epic/Cerner/athena
+                        </p>
+                      </button>
+
+                      {/* Slayer 4: Omni-Submission */}
+                      <button
+                        onClick={() => setIsOmniSubmissionOpen(true)}
+                        className="rounded-lg border border-status-green/20 bg-status-green/3 p-2.5 text-left
+                                   hover:border-status-green/40 hover:bg-status-green/5 transition-all duration-200 group"
+                      >
+                        <span className="text-base">📡</span>
+                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
+                          Omni-Submission Engine
+                        </p>
+                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
+                          FHIR + Fax + Voice AI channels
+                        </p>
+                      </button>
+
+                      {/* Slayer 5: P2P Whisper */}
+                      <button
+                        onClick={() => setIsP2PWhisperOpen(true)}
+                        className="rounded-lg border border-accent-gold/20 bg-accent-gold/3 p-2.5 text-left
+                                   hover:border-accent-gold/40 hover:bg-accent-gold/5 transition-all duration-200 group"
+                      >
+                        <span className="text-base">🎙️</span>
+                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
+                          P2P Whisper Co-Pilot
+                        </p>
+                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
+                          Live call AI rebuttal HUD
+                        </p>
+                      </button>
+
+                      {/* Slayer 6: CMS Enforcer */}
+                      <button
+                        onClick={() => setIsCMSEnforcerOpen(true)}
+                        className="rounded-lg border border-status-red/20 bg-status-red/3 p-2.5 text-left
+                                   hover:border-status-red/40 hover:bg-status-red/5 transition-all duration-200 group"
+                      >
+                        <span className="text-base">⚖️</span>
+                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
+                          CMS-0057-F Enforcer
+                        </p>
+                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
+                          Deadline tracker + default notices
+                        </p>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -857,6 +1018,49 @@ export default function SplitScreenContainer() {
       <P2PCalendar
         isOpen={isP2PCalendarOpen}
         onClose={() => setIsP2PCalendarOpen(false)}
+      />
+
+      {/* ---- ⚡ Workload Slayers Modals ---- */}
+      <PredictiveDenial
+        isOpen={isPredictiveDenialOpen}
+        onClose={() => setIsPredictiveDenialOpen(false)}
+        payerName={payerName}
+        cptCode={cptCode}
+      />
+
+      <ICD10Booster
+        isOpen={isICD10BoosterOpen}
+        onClose={() => setIsICD10BoosterOpen(false)}
+        cptCode={cptCode}
+        payerName={payerName}
+      />
+
+      <EHRWriteBack
+        isOpen={isEHRWriteBackOpen}
+        onClose={() => setIsEHRWriteBackOpen(false)}
+        payerName={payerName}
+        cptCode={cptCode}
+      />
+
+      <OmniSubmission
+        isOpen={isOmniSubmissionOpen}
+        onClose={() => setIsOmniSubmissionOpen(false)}
+        payerName={payerName}
+        cptCode={cptCode}
+      />
+
+      <P2PWhisper
+        isOpen={isP2PWhisperOpen}
+        onClose={() => setIsP2PWhisperOpen(false)}
+        payerName={payerName}
+        cptCode={cptCode}
+      />
+
+      <CMSEnforcer
+        isOpen={isCMSEnforcerOpen}
+        onClose={() => setIsCMSEnforcerOpen(false)}
+        payerName={payerName}
+        cptCode={cptCode}
       />
     </>
   );
