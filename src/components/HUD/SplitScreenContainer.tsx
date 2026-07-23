@@ -5,8 +5,8 @@ import {
   FileText, BarChart3, BookOpen, Loader2, AlertCircle,
   ChevronDown, ChevronUp, Zap,
 } from 'lucide-react';
+import { useCaseState } from '@/lib/useCaseState';
 import SampleCaseSelector from '@/components/HUD/SampleCaseSelector';
-import type { SampleCaseData } from '@/components/HUD/SampleCaseSelector';
 import ChartEditor from '@/components/HUD/ChartEditor';
 import OCRUploadButton from '@/components/HUD/OCRUploadButton';
 import ScoreGauge from '@/components/HUD/ScoreGauge';
@@ -45,7 +45,7 @@ import ControlRoom from '@/components/HUD/ControlRoom';
 import ROITelemetry from '@/components/HUD/ROITelemetry';
 
 // ---------------------------------------------------------------------------
-// Types — mirrored from the evaluation engine & API
+// Types
 // ---------------------------------------------------------------------------
 
 interface SatisfiedCriterion {
@@ -74,37 +74,26 @@ interface PolicyShape {
   criteria: PolicyCriterion[];
 }
 
-interface EvaluationApiResponse {
-  approvalScore: number;
-  riskLevel: 'Low' | 'Medium' | 'High';
-  satisfiedCriteria: SatisfiedCriterion[];
-  missingCriteria: MissingCriterion[];
-  justificationLetter: string;
-  payerName: string;
-  cptCode: string;
-  procedureName: string;
-}
-
 // ---------------------------------------------------------------------------
-// Helper — derive LCD-like policies for drawer display from the raw API shape
+// Helpers
 // ---------------------------------------------------------------------------
 
-function derivePolicyForDrawer(apiResult: EvaluationApiResponse): PolicyShape {
+function derivePolicyForDrawer(payerName: string, cptCode: string, satisfied: SatisfiedCriterion[], missing: MissingCriterion[], lcdNumber?: string): PolicyShape {
   return {
-    payerName: apiResult.payerName,
-    cptCode: apiResult.cptCode,
-    lcdNumber: 'N/A',
+    payerName,
+    cptCode,
+    lcdNumber: lcdNumber ?? 'N/A',
     versionDate: new Date().toLocaleDateString('en-US', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
     }),
     criteria: [
-      ...apiResult.satisfiedCriteria.map((c) => ({
+      ...satisfied.map((c) => ({
         id: c.id,
         description: c.description,
       })),
-      ...apiResult.missingCriteria.map((c) => ({
+      ...missing.map((c) => ({
         id: c.id,
         description: c.description,
       })),
@@ -113,20 +102,30 @@ function derivePolicyForDrawer(apiResult: EvaluationApiResponse): PolicyShape {
 }
 
 // ---------------------------------------------------------------------------
+// PAYER_OPTIONS for custom case editing
+// ---------------------------------------------------------------------------
+
+const PAYER_OPTIONS = [
+  'Aetna',
+  'Blue Cross Blue Shield',
+  'UnitedHealthcare',
+  'Cigna',
+  'Medicare MAC (Novitas)',
+  'Humana',
+];
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 export default function SplitScreenContainer() {
+  const {
+    activeCase,
+    updateCase,
+    runAudit,
+  } = useCaseState();
+
   // ---- UI State -----------------------------------------------------------
-  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
-  const [chartNote, setChartNote] = useState('');
-  const [payerName, setPayerName] = useState<string | null>(null);
-  const [cptCode, setCptCode] = useState<string | null>(null);
-
-  const [evalResult, setEvalResult] = useState<EvaluationApiResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   const [isPolicyOpen, setIsPolicyOpen] = useState(false);
   const [isPacketOpen, setIsPacketOpen] = useState(false);
   const [isFaxOpen, setIsFaxOpen] = useState(false);
@@ -170,94 +169,70 @@ export default function SplitScreenContainer() {
   const [isBenefitRouterOpen, setIsBenefitRouterOpen] = useState(false);
   const [isControlRoomOpen, setIsControlRoomOpen] = useState(false);
 
-  // ---- Handlers -----------------------------------------------------------
+  // ---- Derived from active case ----
+  const chartNote = activeCase?.chartNote ?? '';
+  const payerName = activeCase?.payerName ?? null;
+  const cptCode = activeCase?.cptCode ?? null;
+  const evalResult = activeCase?.auditResult ?? null;
+  const isLoading = activeCase?.isAuditing ?? false;
+  const error = activeCase?.auditError ?? null;
 
-  const handleSelectCase = useCallback((caseData: SampleCaseData) => {
-    setSelectedCaseId(caseData.caseId);
-    setChartNote(caseData.chartNote);
-    setPayerName(caseData.payerName);
-    setCptCode(caseData.cptCode);
-    // Reset previous evaluation since chart/payer changed
-    setEvalResult(null);
-    setError(null);
-  }, []);
-
-  const handleChartChange = useCallback((value: string) => {
-    setChartNote(value);
-    // Clear stale results when user edits the note
-    if (evalResult) {
-      setEvalResult(null);
-      setError(null);
-    }
-  }, [evalResult]);
-
-  /** Trigger the /api/audit-necessity endpoint */
-  const handleRunAudit = useCallback(async () => {
-    if (!chartNote.trim() || !payerName || !cptCode) {
-      setError(
-        'Please select a sample case (or enter a chart note) and ensure a payer and CPT code are available before running the audit.'
-      );
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    setEvalResult(null);
-
-    try {
-      const res = await fetch('/api/audit-necessity', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chartNote: chartNote,
-          payerName,
-          cptCode,
-        }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(
-          data.error ?? `Server responded with status ${res.status}`
-        );
-      }
-
-      const data: EvaluationApiResponse = await res.json();
-      setEvalResult(data);
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'An unexpected error occurred.';
-      setError(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [chartNote, payerName, cptCode]);
-
-  /** Pseudo-OCR handler — just fills the editor */
-  const handleOCRComplete = useCallback(
-    (text: string, caseId?: string) => {
-      setChartNote(text);
-      if (caseId) setSelectedCaseId(caseId);
-      setEvalResult(null);
-      setError(null);
-    },
-    []
-  );
-
-  // ---- Derived values -----------------------------------------------------
   const score = evalResult?.approvalScore ?? 0;
   const riskLevel = evalResult?.riskLevel ?? 'High';
-  const satisfiedCriteria: SatisfiedCriterion[] =
-    evalResult?.satisfiedCriteria ?? [];
-  const missingCriteria: MissingCriterion[] =
-    evalResult?.missingCriteria ?? [];
+  const satisfiedCriteria: SatisfiedCriterion[] = evalResult?.satisfiedCriteria ?? [];
+  const missingCriteria: MissingCriterion[] = evalResult?.missingCriteria ?? [];
   const policy: PolicyShape | null = evalResult
-    ? derivePolicyForDrawer(evalResult)
+    ? derivePolicyForDrawer(
+        evalResult.payerName,
+        evalResult.cptCode,
+        satisfiedCriteria,
+        missingCriteria,
+        (evalResult as any).lcdNumber
+      )
     : null;
   const letter = evalResult?.justificationLetter ?? '';
 
   const canRunAudit =
-    chartNote.trim().length > 0 && payerName !== null && cptCode !== null;
+    chartNote.trim().length > 0 && payerName !== null && cptCode !== null && activeCase !== null;
+
+  // ---- Handlers ----
+
+  const handleChartChange = useCallback(
+    (value: string) => {
+      if (!activeCase) return;
+      updateCase(activeCase.id, { chartNote: value, auditResult: null, auditError: null });
+    },
+    [activeCase, updateCase]
+  );
+
+  const handlePayerChange = useCallback(
+    (value: string) => {
+      if (!activeCase) return;
+      updateCase(activeCase.id, { payerName: value, auditResult: null, auditError: null });
+    },
+    [activeCase, updateCase]
+  );
+
+  const handleCPTChange = useCallback(
+    (value: string) => {
+      if (!activeCase) return;
+      updateCase(activeCase.id, { cptCode: value, auditResult: null, auditError: null });
+    },
+    [activeCase, updateCase]
+  );
+
+  const handleRunAudit = useCallback(async () => {
+    if (!activeCase || !canRunAudit || isLoading) return;
+    await runAudit(activeCase.id);
+  }, [activeCase, canRunAudit, isLoading, runAudit]);
+
+  const handleOCRComplete = useCallback(
+    (text: string) => {
+      if (!activeCase) return;
+      updateCase(activeCase.id, { chartNote: text, auditResult: null, auditError: null });
+    },
+    [activeCase, updateCase]
+  );
 
   return (
     <>
@@ -285,8 +260,50 @@ export default function SplitScreenContainer() {
             </div>
 
             <div className="p-4 space-y-4">
-              {/* Sample Case Selector */}
-              <SampleCaseSelector onSelectCase={handleSelectCase} />
+              {/* Sample Case Selector (now full case manager) */}
+              <SampleCaseSelector />
+
+              {/* Custom case: Payer & CPT inputs */}
+              {activeCase?.isCustom && (
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Payer dropdown */}
+                  <div>
+                    <label className="text-[10px] font-medium text-text-secondary uppercase tracking-wider mb-1 block">
+                      Payer
+                    </label>
+                    <select
+                      value={activeCase.payerName}
+                      onChange={(e) => handlePayerChange(e.target.value)}
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-border-light
+                                 bg-bg-secondary text-text-primary
+                                 focus:outline-none focus:border-accent-blue focus:ring-1 focus:ring-accent-blue/20
+                                 appearance-none cursor-pointer"
+                    >
+                      <option value="">Select payer...</option>
+                      {PAYER_OPTIONS.map((p) => (
+                        <option key={p} value={p}>
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* CPT Code input */}
+                  <div>
+                    <label className="text-[10px] font-medium text-text-secondary uppercase tracking-wider mb-1 block">
+                      CPT Code
+                    </label>
+                    <input
+                      type="text"
+                      value={activeCase.cptCode}
+                      onChange={(e) => handleCPTChange(e.target.value)}
+                      placeholder="e.g. 72148"
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-border-light
+                                 bg-bg-secondary text-text-primary placeholder:text-text-secondary/40
+                                 focus:outline-none focus:border-accent-blue focus:ring-1 focus:ring-accent-blue/20"
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Chart Editor */}
               <div className="min-h-0">
@@ -295,7 +312,6 @@ export default function SplitScreenContainer() {
 
               {/* ---- Action Row: Run Audit + OCR ---- */}
               <div className="flex flex-col sm:flex-row gap-3">
-                {/* Run Audit button */}
                 <button
                   onClick={handleRunAudit}
                   disabled={!canRunAudit || isLoading}
@@ -318,10 +334,9 @@ export default function SplitScreenContainer() {
                   )}
                 </button>
 
-                {/* OCR Upload Button */}
                 <OCRUploadButton
                   onOCRComplete={handleOCRComplete}
-                  selectedCaseId={selectedCaseId}
+                  selectedCaseId={activeCase?.id ?? null}
                 />
               </div>
 
@@ -332,6 +347,11 @@ export default function SplitScreenContainer() {
                     {payerName}
                   </span>
                   <span>CPT {cptCode}</span>
+                  {activeCase?.isCustom && (
+                    <span className="px-2 py-0.5 rounded-full bg-accent-gold/10 text-accent-gold font-medium">
+                      Custom Case
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -396,7 +416,7 @@ export default function SplitScreenContainer() {
                     <BarChart3 size={40} className="text-accent-gold/30" />
                   </div>
                   <p className="text-sm text-text-secondary/60 max-w-xs">
-                    Select a sample case and click <strong>Run Audit</strong> to see the
+                    Select a case and click <strong>Run Audit</strong> to see the
                     approval likelihood score.
                   </p>
                 </div>
@@ -489,7 +509,6 @@ export default function SplitScreenContainer() {
                   )}
                 </button>
 
-                {/* Expandable Content */}
                 <div
                   className={`overflow-hidden transition-all duration-300 ease-in-out ${
                     isWorkloadToolsExpanded ? 'max-h-[800px] opacity-100 mt-2' : 'max-h-0 opacity-0'
@@ -522,7 +541,7 @@ export default function SplitScreenContainer() {
                       </button>
                     </div>
 
-                    {/* Tool 2: ERISA & State Prompt-Pay Statute Clock */}
+                    {/* Tool 2: ERISA Statute Clock */}
                     <div className="rounded-lg border border-accent-blue/20 bg-accent-blue/3 p-3">
                       <div className="flex items-center gap-1.5 mb-2">
                         <span className="text-[11px] font-semibold text-text-primary">
@@ -587,7 +606,6 @@ export default function SplitScreenContainer() {
                   )}
                 </button>
 
-                {/* Expandable PA-OS Grid */}
                 <div
                   className={`overflow-hidden transition-all duration-300 ease-in-out ${
                     isPACommandCenterExpanded ? 'max-h-[1200px] opacity-100 mt-2' : 'max-h-0 opacity-0'
@@ -595,95 +613,24 @@ export default function SplitScreenContainer() {
                 >
                   <div className="px-3 pb-3">
                     <div className="grid grid-cols-2 gap-2">
-                      {/* Module 1: Rx Step-Therapy */}
-                      <button
-                        onClick={() => setIsRxStepTherapyOpen(true)}
-                        className="rounded-lg border border-accent-blue/20 bg-accent-blue/3 p-2.5 text-left
-                                   hover:border-accent-blue/40 hover:bg-accent-blue/5 transition-all duration-200 group"
-                      >
-                        <span className="text-base">💊</span>
-                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
-                          Specialty Rx & Step-Therapy
-                        </p>
-                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
-                          Formulary lookup + exception letters
-                        </p>
-                      </button>
-
-                      {/* Module 2: Appeal Engine */}
-                      <button
-                        onClick={() => setIsAppealEngineOpen(true)}
-                        className="rounded-lg border border-accent-gold/20 bg-accent-gold/3 p-2.5 text-left
-                                   hover:border-accent-gold/40 hover:bg-accent-gold/5 transition-all duration-200 group"
-                      >
-                        <span className="text-base">📋</span>
-                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
-                          Multi-Tier Appeal Tracker
-                        </p>
-                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
-                          Level 1 → IRO escalation
-                        </p>
-                      </button>
-
-                      {/* Module 3: Retro-PA Mode */}
-                      <button
-                        onClick={() => setIsRetroPAModeOpen(true)}
-                        className="rounded-lg border border-status-red/20 bg-status-red/3 p-2.5 text-left
-                                   hover:border-status-red/40 hover:bg-status-red/5 transition-all duration-200 group"
-                      >
-                        <span className="text-base">🚨</span>
-                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
-                          72-Hour Retro-PA Mode
-                        </p>
-                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
-                          EMTALA emergency authorization
-                        </p>
-                      </button>
-
-                      {/* Module 4: Portal SSO Vault */}
-                      <button
-                        onClick={() => setIsPortalSSOVaultOpen(true)}
-                        className="rounded-lg border border-bg-navy/20 bg-bg-navy/3 p-2.5 text-left
-                                   hover:border-bg-navy/40 hover:bg-bg-navy/5 transition-all duration-200 group"
-                      >
-                        <span className="text-base">🔑</span>
-                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
-                          Portal SSO Vault
-                        </p>
-                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
-                          AES-256 encrypted credentials
-                        </p>
-                      </button>
-
-                      {/* Module 5: Audio Brief */}
-                      <button
-                        onClick={() => setIsAudioBriefOpen(true)}
-                        className="rounded-lg border border-status-green/20 bg-status-green/3 p-2.5 text-left
-                                   hover:border-status-green/40 hover:bg-status-green/5 transition-all duration-200 group"
-                      >
-                        <span className="text-base">🎧</span>
-                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
-                          60-Sec Doctor Audio Brief
-                        </p>
-                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
-                          AI P2P call prep script
-                        </p>
-                      </button>
-
-                      {/* Module 6: Copay Matcher */}
-                      <button
-                        onClick={() => setIsCopayMatcherOpen(true)}
-                        className="rounded-lg border border-accent-gold/20 bg-accent-gold/3 p-2.5 text-left
-                                   hover:border-accent-gold/40 hover:bg-accent-gold/5 transition-all duration-200 group"
-                      >
-                        <span className="text-base">💰</span>
-                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
-                          Copay Assistance Programs
-                        </p>
-                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
-                          Manufacturer + foundation match
-                        </p>
-                      </button>
+                      {[
+                        { label: 'Specialty Rx & Step-Therapy', desc: 'Formulary lookup + exception letters', icon: '💊', open: () => setIsRxStepTherapyOpen(true), cls: 'border-accent-blue/20 bg-accent-blue/3 hover:border-accent-blue/40' },
+                        { label: 'Multi-Tier Appeal Tracker', desc: 'Level 1 → IRO escalation', icon: '📋', open: () => setIsAppealEngineOpen(true), cls: 'border-accent-gold/20 bg-accent-gold/3 hover:border-accent-gold/40' },
+                        { label: '72-Hour Retro-PA Mode', desc: 'EMTALA emergency authorization', icon: '🚨', open: () => setIsRetroPAModeOpen(true), cls: 'border-status-red/20 bg-status-red/3 hover:border-status-red/40' },
+                        { label: 'Portal SSO Vault', desc: 'AES-256 encrypted credentials', icon: '🔑', open: () => setIsPortalSSOVaultOpen(true), cls: 'border-bg-navy/20 bg-bg-navy/3 hover:border-bg-navy/40' },
+                        { label: '60-Sec Doctor Audio Brief', desc: 'AI P2P call prep script', icon: '🎧', open: () => setIsAudioBriefOpen(true), cls: 'border-status-green/20 bg-status-green/3 hover:border-status-green/40' },
+                        { label: 'Copay Assistance Programs', desc: 'Manufacturer + foundation match', icon: '💰', open: () => setIsCopayMatcherOpen(true), cls: 'border-accent-gold/20 bg-accent-gold/3 hover:border-accent-gold/40' },
+                      ].map((m, i) => (
+                        <button
+                          key={i}
+                          onClick={m.open}
+                          className={`rounded-lg border p-2.5 text-left transition-all duration-200 group ${m.cls}`}
+                        >
+                          <span className="text-base">{m.icon}</span>
+                          <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">{m.label}</p>
+                          <p className="text-[9px] text-text-secondary/60 mt-0.5">{m.desc}</p>
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -711,7 +658,6 @@ export default function SplitScreenContainer() {
                   )}
                 </button>
 
-                {/* Expandable Grid */}
                 <div
                   className={`overflow-hidden transition-all duration-300 ease-in-out ${
                     isRegulatoryExpanded ? 'max-h-[1200px] opacity-100 mt-2' : 'max-h-0 opacity-0'
@@ -719,95 +665,24 @@ export default function SplitScreenContainer() {
                 >
                   <div className="px-3 pb-3">
                     <div className="grid grid-cols-2 gap-2">
-                      {/* Tool 1: Anti-AI Denial */}
-                      <button
-                        onClick={() => setIsAntiAIDenialOpen(true)}
-                        className="rounded-lg border border-status-red/20 bg-status-red/3 p-2.5 text-left
-                                   hover:border-status-red/40 hover:bg-status-red/5 transition-all duration-200 group"
-                      >
-                        <span className="text-base">🛡️</span>
-                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
-                          Anti-AI Denial Countermeasure
-                        </p>
-                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
-                          CMS-0057-F algorithmic audit
-                        </p>
-                      </button>
-
-                      {/* Tool 2: Gold-Card Tracker */}
-                      <button
-                        onClick={() => setIsGoldCardTrackerOpen(true)}
-                        className="rounded-lg border border-accent-gold/20 bg-accent-gold/3 p-2.5 text-left
-                                   hover:border-accent-gold/40 hover:bg-accent-gold/5 transition-all duration-200 group"
-                      >
-                        <span className="text-base">🏆</span>
-                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
-                          Gold-Card Exemption Tracker
-                        </p>
-                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
-                          TX, WV, LA statutory exemptions
-                        </p>
-                      </button>
-
-                      {/* Tool 3: DOI Complaint */}
-                      <button
-                        onClick={() => setIsDOIComplaintOpen(true)}
-                        className="rounded-lg border border-status-red/20 bg-status-red/3 p-2.5 text-left
-                                   hover:border-status-red/40 hover:bg-status-red/5 transition-all duration-200 group"
-                      >
-                        <span className="text-base">🚀</span>
-                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
-                          DOI Complaint Escalator
-                        </p>
-                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
-                          Instant regulatory filing
-                        </p>
-                      </button>
-
-                      {/* Tool 4: FHIR ePA Client */}
-                      <button
-                        onClick={() => setIsFHIRClientOpen(true)}
-                        className="rounded-lg border border-accent-blue/20 bg-accent-blue/3 p-2.5 text-left
-                                   hover:border-accent-blue/40 hover:bg-accent-blue/5 transition-all duration-200 group"
-                      >
-                        <span className="text-base">🔗</span>
-                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
-                          FHIR Da Vinci ePA Client
-                        </p>
-                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
-                          CRD / DTR / PAS engine
-                        </p>
-                      </button>
-
-                      {/* Tool 5: Revenue Prioritizer */}
-                      <button
-                        onClick={() => setIsRevenuePrioritizerOpen(true)}
-                        className="rounded-lg border border-accent-gold/20 bg-accent-gold/3 p-2.5 text-left
-                                   hover:border-accent-gold/40 hover:bg-accent-gold/5 transition-all duration-200 group"
-                      >
-                        <span className="text-base">💰</span>
-                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
-                          Revenue-at-Risk Prioritizer
-                        </p>
-                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
-                          Sorted by financial impact
-                        </p>
-                      </button>
-
-                      {/* Tool 6: P2P Calendar */}
-                      <button
-                        onClick={() => setIsP2PCalendarOpen(true)}
-                        className="rounded-lg border border-status-green/20 bg-status-green/3 p-2.5 text-left
-                                   hover:border-status-green/40 hover:bg-status-green/5 transition-all duration-200 group"
-                      >
-                        <span className="text-base">📅</span>
-                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
-                          P2P Calendar Concierge
-                        </p>
-                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
-                          1-click booking + battle card
-                        </p>
-                      </button>
+                      {[
+                        { label: 'Anti-AI Denial Countermeasure', desc: 'CMS-0057-F algorithmic audit', icon: '🛡️', open: () => setIsAntiAIDenialOpen(true), cls: 'border-status-red/20 bg-status-red/3' },
+                        { label: 'Gold-Card Exemption Tracker', desc: 'TX, WV, LA statutory exemptions', icon: '🏆', open: () => setIsGoldCardTrackerOpen(true), cls: 'border-accent-gold/20 bg-accent-gold/3' },
+                        { label: 'DOI Complaint Escalator', desc: 'Instant regulatory filing', icon: '🚀', open: () => setIsDOIComplaintOpen(true), cls: 'border-status-red/20 bg-status-red/3' },
+                        { label: 'FHIR Da Vinci ePA Client', desc: 'CRD / DTR / PAS engine', icon: '🔗', open: () => setIsFHIRClientOpen(true), cls: 'border-accent-blue/20 bg-accent-blue/3' },
+                        { label: 'Revenue-at-Risk Prioritizer', desc: 'Sorted by financial impact', icon: '💰', open: () => setIsRevenuePrioritizerOpen(true), cls: 'border-accent-gold/20 bg-accent-gold/3' },
+                        { label: 'P2P Calendar Concierge', desc: '1-click booking + battle card', icon: '📅', open: () => setIsP2PCalendarOpen(true), cls: 'border-status-green/20 bg-status-green/3' },
+                      ].map((m, i) => (
+                        <button
+                          key={i}
+                          onClick={m.open}
+                          className={`rounded-lg border p-2.5 text-left transition-all duration-200 group hover:brightness-95 ${m.cls}`}
+                        >
+                          <span className="text-base">{m.icon}</span>
+                          <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">{m.label}</p>
+                          <p className="text-[9px] text-text-secondary/60 mt-0.5">{m.desc}</p>
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -835,7 +710,6 @@ export default function SplitScreenContainer() {
                   )}
                 </button>
 
-                {/* Expandable Grid */}
                 <div
                   className={`overflow-hidden transition-all duration-300 ease-in-out ${
                     isWorkloadSlayersExpanded ? 'max-h-[1400px] opacity-100 mt-2' : 'max-h-0 opacity-0'
@@ -843,95 +717,24 @@ export default function SplitScreenContainer() {
                 >
                   <div className="px-3 pb-3">
                     <div className="grid grid-cols-2 gap-2">
-                      {/* Slayer 1: Predictive Denial */}
-                      <button
-                        onClick={() => setIsPredictiveDenialOpen(true)}
-                        className="rounded-lg border border-status-red/20 bg-status-red/3 p-2.5 text-left
-                                   hover:border-status-red/40 hover:bg-status-red/5 transition-all duration-200 group"
-                      >
-                        <span className="text-base">🔮</span>
-                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
-                          Predictive Denial Risk Engine
-                        </p>
-                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
-                          ML denial probability + weakness flags
-                        </p>
-                      </button>
-
-                      {/* Slayer 2: ICD-10 Booster */}
-                      <button
-                        onClick={() => setIsICD10BoosterOpen(true)}
-                        className="rounded-lg border border-accent-blue/20 bg-accent-blue/3 p-2.5 text-left
-                                   hover:border-accent-blue/40 hover:bg-accent-blue/5 transition-all duration-200 group"
-                      >
-                        <span className="text-base">🎯</span>
-                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
-                          ICD-10 Specificity Booster
-                        </p>
-                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
-                          Auto-upgrade codes + CPT modifiers
-                        </p>
-                      </button>
-
-                      {/* Slayer 3: EHR Write-Back */}
-                      <button
-                        onClick={() => setIsEHRWriteBackOpen(true)}
-                        className="rounded-lg border border-accent-blue/20 bg-accent-blue/3 p-2.5 text-left
-                                   hover:border-accent-blue/40 hover:bg-accent-blue/5 transition-all duration-200 group"
-                      >
-                        <span className="text-base">📤</span>
-                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
-                          EHR InBasket Write-Back
-                        </p>
-                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
-                          Push addendum to Epic/Cerner/athena
-                        </p>
-                      </button>
-
-                      {/* Slayer 4: Omni-Submission */}
-                      <button
-                        onClick={() => setIsOmniSubmissionOpen(true)}
-                        className="rounded-lg border border-status-green/20 bg-status-green/3 p-2.5 text-left
-                                   hover:border-status-green/40 hover:bg-status-green/5 transition-all duration-200 group"
-                      >
-                        <span className="text-base">📡</span>
-                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
-                          Omni-Submission Engine
-                        </p>
-                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
-                          FHIR + Fax + Voice AI channels
-                        </p>
-                      </button>
-
-                      {/* Slayer 5: P2P Whisper */}
-                      <button
-                        onClick={() => setIsP2PWhisperOpen(true)}
-                        className="rounded-lg border border-accent-gold/20 bg-accent-gold/3 p-2.5 text-left
-                                   hover:border-accent-gold/40 hover:bg-accent-gold/5 transition-all duration-200 group"
-                      >
-                        <span className="text-base">🎙️</span>
-                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
-                          P2P Whisper Co-Pilot
-                        </p>
-                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
-                          Live call AI rebuttal HUD
-                        </p>
-                      </button>
-
-                      {/* Slayer 6: CMS Enforcer */}
-                      <button
-                        onClick={() => setIsCMSEnforcerOpen(true)}
-                        className="rounded-lg border border-status-red/20 bg-status-red/3 p-2.5 text-left
-                                   hover:border-status-red/40 hover:bg-status-red/5 transition-all duration-200 group"
-                      >
-                        <span className="text-base">⚖️</span>
-                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
-                          CMS-0057-F Enforcer
-                        </p>
-                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
-                          Deadline tracker + default notices
-                        </p>
-                      </button>
+                      {[
+                        { label: 'Predictive Denial Risk Engine', desc: 'ML denial probability + weakness flags', icon: '🔮', open: () => setIsPredictiveDenialOpen(true), cls: 'border-status-red/20 bg-status-red/3' },
+                        { label: 'ICD-10 Specificity Booster', desc: 'Auto-upgrade codes + CPT modifiers', icon: '🎯', open: () => setIsICD10BoosterOpen(true), cls: 'border-accent-blue/20 bg-accent-blue/3' },
+                        { label: 'EHR InBasket Write-Back', desc: 'Push addendum to Epic/Cerner/athena', icon: '📤', open: () => setIsEHRWriteBackOpen(true), cls: 'border-accent-blue/20 bg-accent-blue/3' },
+                        { label: 'Omni-Submission Engine', desc: 'FHIR + Fax + Voice AI channels', icon: '📡', open: () => setIsOmniSubmissionOpen(true), cls: 'border-status-green/20 bg-status-green/3' },
+                        { label: 'P2P Whisper Co-Pilot', desc: 'Live call AI rebuttal HUD', icon: '🎙️', open: () => setIsP2PWhisperOpen(true), cls: 'border-accent-gold/20 bg-accent-gold/3' },
+                        { label: 'CMS-0057-F Enforcer', desc: 'Deadline tracker + default notices', icon: '⚖️', open: () => setIsCMSEnforcerOpen(true), cls: 'border-status-red/20 bg-status-red/3' },
+                      ].map((m, i) => (
+                        <button
+                          key={i}
+                          onClick={m.open}
+                          className={`rounded-lg border p-2.5 text-left transition-all duration-200 group hover:brightness-95 ${m.cls}`}
+                        >
+                          <span className="text-base">{m.icon}</span>
+                          <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">{m.label}</p>
+                          <p className="text-[9px] text-text-secondary/60 mt-0.5">{m.desc}</p>
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -959,7 +762,6 @@ export default function SplitScreenContainer() {
                   )}
                 </button>
 
-                {/* Expandable Grid */}
                 <div
                   className={`overflow-hidden transition-all duration-300 ease-in-out ${
                     isStandaloneExpanded ? 'max-h-[1400px] opacity-100 mt-2' : 'max-h-0 opacity-0'
@@ -967,112 +769,25 @@ export default function SplitScreenContainer() {
                 >
                   <div className="px-3 pb-3">
                     <div className="grid grid-cols-2 gap-2">
-                      {/* Module 1: PDF Snipper */}
-                      <button
-                        onClick={() => setIsPDFSnipperOpen(true)}
-                        className="rounded-lg border border-[#1E5CD4]/20 bg-[#1E5CD4]/3 p-2.5 text-left
-                                   hover:border-[#1E5CD4]/40 hover:bg-[#1E5CD4]/5 transition-all duration-200 group"
-                      >
-                        <span className="text-base">📄</span>
-                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
-                          OCR PDF Snipper
-                        </p>
-                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
-                          Drag-drop + evidence binder
-                        </p>
-                      </button>
-
-                      {/* Module 2: Doc Signature Bridge */}
-                      <button
-                        onClick={() => setIsDocSignatureBridgeOpen(true)}
-                        className="rounded-lg border border-[#FAD23B]/20 bg-[#FAD23B]/3 p-2.5 text-left
-                                   hover:border-[#FAD23B]/40 hover:bg-[#FAD23B]/5 transition-all duration-200 group"
-                      >
-                        <span className="text-base">📱</span>
-                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
-                          Doc Signature Bridge
-                        </p>
-                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
-                          SMS digital signature addendum
-                        </p>
-                      </button>
-
-                      {/* Module 3: Voice AI Bot */}
-                      <button
-                        onClick={() => setIsVoiceBotOpen(true)}
-                        className="rounded-lg border border-[#0B1F3A]/20 bg-[#0B1F3A]/3 p-2.5 text-left
-                                   hover:border-[#0B1F3A]/40 hover:bg-[#0B1F3A]/5 transition-all duration-200 group"
-                      >
-                        <span className="text-base">🤖</span>
-                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
-                          Voice AI Phone Bot
-                        </p>
-                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
-                          Auto IVR + PA status retrieval
-                        </p>
-                      </button>
-
-                      {/* Module 4: Kanban Tracker */}
-                      <button
-                        onClick={() => setIsKanbanTrackerOpen(true)}
-                        className="rounded-lg border border-[#1E5CD4]/20 bg-[#1E5CD4]/3 p-2.5 text-left
-                                   hover:border-[#1E5CD4]/40 hover:bg-[#1E5CD4]/5 transition-all duration-200 group"
-                      >
-                        <span className="text-base">📋</span>
-                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
-                          Master PA Kanban
-                        </p>
-                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
-                          Visual drag-drop workflow tracker
-                        </p>
-                      </button>
-
-                      {/* Module 5: Provider Vault */}
-                      <button
-                        onClick={() => setIsProviderVaultOpen(true)}
-                        className="rounded-lg border border-[#0B1F3A]/20 bg-[#0B1F3A]/3 p-2.5 text-left
-                                   hover:border-[#0B1F3A]/40 hover:bg-[#0B1F3A]/5 transition-all duration-200 group"
-                      >
-                        <span className="text-base">🔑</span>
-                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
-                          Provider Credentials Vault
-                        </p>
-                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
-                          NPI, PTAN, license storage
-                        </p>
-                      </button>
-
-                      {/* Module 6: Benefit Router */}
-                      <button
-                        onClick={() => setIsBenefitRouterOpen(true)}
-                        className="rounded-lg border border-[#FAD23B]/20 bg-[#FAD23B]/3 p-2.5 text-left
-                                   hover:border-[#FAD23B]/40 hover:bg-[#FAD23B]/5 transition-all duration-200 group"
-                      >
-                        <span className="text-base">🔀</span>
-                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
-                          Dual-Silo Benefit Router
-                        </p>
-                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
-                          Pharmacy vs Medical routing
-                        </p>
-                      </button>
-
-                      {/* Module 7: Control Room */}
-                      <button
-                        onClick={() => setIsControlRoomOpen(true)}
-                        className="rounded-lg border border-[#1E5CD4]/20 bg-[#1E5CD4]/3 p-2.5 text-left
-                                   hover:border-[#1E5CD4]/40 hover:bg-[#1E5CD4]/5 transition-all duration-200 group"
-                      >
-                        <span className="text-base">🏢</span>
-                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
-                          Multi-Practice Control Room
-                        </p>
-                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
-                          Aggregated practice oversight
-                        </p>
-                      </button>
-
-                      {/* ROI Telemetry (mini inline widget) */}
+                      {[
+                        { label: 'OCR PDF Snipper', desc: 'Drag-drop + evidence binder', icon: '📄', open: () => setIsPDFSnipperOpen(true), cls: 'border-[#1E5CD4]/20 bg-[#1E5CD4]/3' },
+                        { label: 'Doc Signature Bridge', desc: 'SMS digital signature addendum', icon: '📱', open: () => setIsDocSignatureBridgeOpen(true), cls: 'border-[#FAD23B]/20 bg-[#FAD23B]/3' },
+                        { label: 'Voice AI Phone Bot', desc: 'Auto IVR + PA status retrieval', icon: '🤖', open: () => setIsVoiceBotOpen(true), cls: 'border-[#0B1F3A]/20 bg-[#0B1F3A]/3' },
+                        { label: 'Master PA Kanban', desc: 'Visual drag-drop workflow tracker', icon: '📋', open: () => setIsKanbanTrackerOpen(true), cls: 'border-[#1E5CD4]/20 bg-[#1E5CD4]/3' },
+                        { label: 'Provider Credentials Vault', desc: 'NPI, PTAN, license storage', icon: '🔑', open: () => setIsProviderVaultOpen(true), cls: 'border-[#0B1F3A]/20 bg-[#0B1F3A]/3' },
+                        { label: 'Dual-Silo Benefit Router', desc: 'Pharmacy vs Medical routing', icon: '🔀', open: () => setIsBenefitRouterOpen(true), cls: 'border-[#FAD23B]/20 bg-[#FAD23B]/3' },
+                        { label: 'Multi-Practice Control Room', desc: 'Aggregated practice oversight', icon: '🏢', open: () => setIsControlRoomOpen(true), cls: 'border-[#1E5CD4]/20 bg-[#1E5CD4]/3' },
+                      ].map((m, i) => (
+                        <button
+                          key={i}
+                          onClick={m.open}
+                          className={`rounded-lg border p-2.5 text-left transition-all duration-200 group hover:brightness-95 ${m.cls}`}
+                        >
+                          <span className="text-base">{m.icon}</span>
+                          <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">{m.label}</p>
+                          <p className="text-[9px] text-text-secondary/60 mt-0.5">{m.desc}</p>
+                        </button>
+                      ))}
                       <div className="col-span-2 mt-1">
                         <ROITelemetry compact />
                       </div>

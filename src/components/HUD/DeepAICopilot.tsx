@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sparkles,
@@ -18,11 +18,19 @@ import {
   MessageSquare,
   Stethoscope,
   BookOpen,
+  AlertTriangle,
+  ShieldCheck,
+  ThumbsUp,
 } from 'lucide-react';
+import { useCaseState } from '@/lib/useCaseState';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 interface Message {
   id: number;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: Date;
 }
@@ -34,7 +42,11 @@ interface SuggestionChip {
   query: string;
 }
 
-const suggestionChips: SuggestionChip[] = [
+// ---------------------------------------------------------------------------
+// Static suggestion chips (shown when no case-specific context)
+// ---------------------------------------------------------------------------
+
+const staticSuggestionChips: SuggestionChip[] = [
   {
     id: 'bcbs-rules',
     icon: <ClipboardCheck size={14} />,
@@ -73,7 +85,10 @@ const suggestionChips: SuggestionChip[] = [
   },
 ];
 
-// Simulated AI responses keyed by trigger words
+// ---------------------------------------------------------------------------
+// Simulated response engine
+// ---------------------------------------------------------------------------
+
 const simulatedResponses: Record<string, string> = {
   bcbs:
     'Based on BCBS July 2026 medical policy for lumbar spine procedures (SUR724.016), conservative therapy requirements include:\n\n1. **6 weeks** of physician-directed conservative management\n2. Must include **NSAIDs + physical therapy** documented\n3. At least **2 modalities** attempted (PT, chiropractic, injections)\n4. Failure must be documented with outcome measures\n\n⚠️ Your chart shows 4 weeks of PT — consider documenting 2 more weeks before submission.',
@@ -91,39 +106,222 @@ const simulatedResponses: Record<string, string> = {
     "I've analyzed your query and cross-referenced it against the current payer policies loaded in the system.\n\nBased on CMS LCD/NCD guidelines and the major payer medical policies (Aetna, BCBS, UHC — July 2026 editions), here's what I found:\n\n• Your request aligns with standard coverage criteria\n• Conservative therapy documentation appears sufficient\n• Consider adding functional outcome measures to strengthen the case\n\nWould you like me to draft specific language for the appeal letter or generate P2P talking points?",
 };
 
-function getSimulatedResponse(query: string): string {
+function getBasicSimulatedResponse(query: string): string {
   const q = query.toLowerCase();
   if (q.includes('bcbs') || q.includes('conservative therapy')) return simulatedResponses.bcbs;
   if (q.includes('humira') || q.includes('fda')) return simulatedResponses.humira;
-  if (q.includes('pubmed') || q.includes('72148') || q.includes('evidence')) return simulatedResponses.pubmed;
+  if (q.includes('pubmed') || (q.includes('72148') && q.includes('evidence'))) return simulatedResponses.pubmed;
   if (q.includes('texas') || q.includes('prompt-pay') || q.includes('statute')) return simulatedResponses.texas;
   if (q.includes('insert') || q.includes('section 2')) return simulatedResponses.insert;
-  if (q.includes('p2p') || q.includes('talking points') || q.includes('peer-to-peer')) return simulatedResponses.p2p;
+  if (q.includes('p2p') || (q.includes('talking points') && !q.includes('case'))) return simulatedResponses.p2p;
   return simulatedResponses.default;
 }
+
+// ---------------------------------------------------------------------------
+// Case-specific response generator
+// ---------------------------------------------------------------------------
+
+function generateCaseSpecificResponse(
+  query: string,
+  payerName: string,
+  cptCode: string,
+  procedureName: string,
+  approvalScore: number | null,
+  riskLevel: string,
+  satisfiedCriteria: { description: string }[],
+  missingCriteria: { description: string; recommendedAction: string }[],
+  hasResult: boolean
+): string | null {
+  const q = query.toLowerCase();
+
+  // "What criteria does this case meet?"
+  if (
+    (q.includes('criteria') && (q.includes('meet') || q.includes('satisfied') || q.includes('pass'))) ||
+    q.includes('what criteria')
+  ) {
+    if (!hasResult) {
+      return `I don't have audit results for this case yet. Please run the audit first by clicking **Run Audit** in the Clinical Chart Editor panel. Once the audit completes, I'll be able to tell you exactly which criteria are met and which are missing for ${payerName} CPT ${cptCode}.`;
+    }
+    const metList = satisfiedCriteria.length > 0
+      ? satisfiedCriteria.map((c) => `  ✅ ${c.description}`).join('\n')
+      : '  (No criteria were satisfied)';
+    const missingList = missingCriteria.length > 0
+      ? missingCriteria.map((c) => `  ❌ ${c.description}`).join('\n')
+      : '  (All criteria are satisfied!)';
+    return `**Criteria Analysis for ${payerName} — CPT ${cptCode}**\n\n**SATISFIED CRITERIA:**\n${metList}\n\n**MISSING CRITERIA:**\n${missingList}\n\n📊 Overall approval score: **${approvalScore}%** (${riskLevel} risk)`;
+  }
+
+  // "What's missing for approval?"
+  if (q.includes('missing') || q.includes('what do i need') || q.includes('how to fix') || q.includes('denial risk')) {
+    if (!hasResult) {
+      return `I don't have audit results yet. Run the audit first, and I'll show you exactly what's missing and how to fix it for ${payerName} CPT ${cptCode}.`;
+    }
+    if (missingCriteria.length === 0) {
+      return `✅ **Great news!** All criteria for ${payerName} CPT ${cptCode} are satisfied. Your approval score is **${approvalScore}%** (${riskLevel} risk). This case looks ready for submission!\n\nWould you like me to generate the justification letter?`;
+    }
+    const missingList = missingCriteria.map((c) =>
+      `  ❌ **${c.description}**\n     💡 *Fix:* ${c.recommendedAction}`
+    ).join('\n\n');
+    return `**What's Missing for ${payerName} — CPT ${cptCode}**\n\n${missingList}\n\n📊 Current approval score: **${approvalScore}%** (${riskLevel} risk)\n\nAddress these items to strengthen your case. Want me to draft an addendum for any of these?`;
+  }
+
+  // "What does [Payer] require for [CPT]?"
+  if (q.includes('require') || q.includes('policy') || q.includes('coverage') || q.includes('what does') || q.includes('criteria for')) {
+    if (!hasResult) {
+      return `I have ${payerName}'s policy loaded for CPT ${cptCode} (${procedureName || 'this procedure'}). To check which specific criteria this case meets, I'd recommend running the audit first. Would you like me to explain the general coverage requirements?`;
+    }
+    return `**${payerName} Coverage Policy for CPT ${cptCode} (${procedureName || 'this procedure'})**\n\nThis case has an approval score of **${approvalScore}%** (${riskLevel} risk).\n\n📋 **Criteria Checklist:**\n${satisfiedCriteria.map((c) => `  ✅ ${c.description}`).join('\n')}\n${missingCriteria.map((c) => `  ❌ ${c.description}`).join('\n')}\n\nWould you like me to explain any specific criterion in detail?`;
+  }
+
+  // "Generate appeal letter"
+  if (q.includes('appeal letter') || q.includes('justification letter') || q.includes('generate letter')) {
+    if (!hasResult) {
+      return `To generate a case-specific appeal letter for ${payerName} CPT ${cptCode}, I need the audit results first. Please click **Run Audit** and then I'll generate a pre-formatted justification letter you can use in the **Generate Appeal Packet** modal.`;
+    }
+    return `✅ Your justification letter for ${payerName} CPT ${cptCode} is ready!\n\nClick **Generate Appeal Packet** in the Audit Scorecard panel to view the full letter. It includes:\n\n• Patient clinical summary\n• Satisfied criteria with citations\n• Missing criteria with recommendations\n• Formatted for payer submission\n\nApproval score: **${approvalScore}%** (${riskLevel} risk)`;
+  }
+
+  // "What's my approval score?"
+  if (q.includes('approval score') || q.includes('what is my score') || q.includes('how likely')) {
+    if (!hasResult) {
+      return `I don't have an approval score for this case yet. Run the audit using the **Run Audit** button and I'll calculate the likelihood of approval for ${payerName} CPT ${cptCode}.`;
+    }
+    const emoji = approvalScore !== null && approvalScore >= 80 ? '🟢' : approvalScore !== null && approvalScore >= 50 ? '🟡' : '🔴';
+    return `${emoji} **Approval Score: ${approvalScore}%** — ${riskLevel} risk of denial\n\nPayer: ${payerName}\nProcedure: ${procedureName || 'N/A'} (CPT ${cptCode})\n\n${satisfiedCriteria.length} criteria satisfied, ${missingCriteria.length} missing.\n\n${missingCriteria.length > 0 ? '⚠️ Address the missing criteria to improve your score.' : '✅ All criteria are satisfied!'}`;
+  }
+
+  // "Write a P2P script for this case"
+  if (q.includes('p2p') || q.includes('peer-to-peer') || q.includes('talking points')) {
+    if (!hasResult) {
+      return `I can generate a P2P call script for your ${payerName} case (CPT ${cptCode}). For the most accurate talking points, run the audit first so I can reference the specific satisfied and missing criteria.`;
+    }
+    const missingPoints = missingCriteria.length > 0
+      ? `\n\n**Anticipated Pushback & Rebuttals:**\n${missingCriteria.map((c) => `• If they question **${c.description}** → Respond with: "${c.recommendedAction}"`).join('\n')}`
+      : '';
+    const metPoints = satisfiedCriteria.slice(0, 4).map((c) => `• ${c.description}`).join('\n');
+    return `**🎙️ P2P Call Script: ${payerName} — CPT ${cptCode}**\n\n**Opening:**\n"Hi, this is Dr. [Name] calling regarding prior auth case # [ID] for ${procedureName || 'this procedure'}."\n\n**Key Talking Points:**\n${metPoints}\n\n**The Ask:**\n"Based on ${payerName}'s own medical policy, this patient meets ${satisfiedCriteria.length} of the required criteria. I'm requesting approval for medically necessary ${procedureName || 'treatment'}."${missingPoints}\n\n📊 Case approval score: **${approvalScore}%**`;
+  }
+
+  // No specific match for case-aware queries — fall through
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Helper
+// ---------------------------------------------------------------------------
 
 function formatTime(date: Date): string {
   return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 }
 
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 export default function DeepAICopilot() {
+  // Try to get case state; if not wrapped (e.g., on landing page), gracefully degrade
+  let caseState = null;
+  try {
+    caseState = useCaseState();
+  } catch {
+    // Not inside CaseProvider — copilot works without case context
+  }
+
+  const activeCase = caseState?.activeCase ?? null;
+  const auditResult = activeCase?.auditResult ?? null;
+  const payerName = activeCase?.payerName ?? 'Unknown';
+  const cptCode = activeCase?.cptCode ?? 'Unknown';
+  const procedureName = auditResult?.procedureName ?? 'this procedure';
+  const approvalScore = auditResult?.approvalScore ?? null;
+  const riskLevel = auditResult?.riskLevel ?? 'High';
+  const satisfiedCriteria = auditResult?.satisfiedCriteria ?? [];
+  const missingCriteria = auditResult?.missingCriteria ?? [];
+  const hasResult = auditResult !== null;
+
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 0,
-      role: 'assistant',
-      content:
-        "Hello! I'm your MedHero DeepAI Copilot. I have full context of your current case and can help with guideline lookups, evidence searches, appeal drafting, and more. How can I assist?",
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [hasShownProactive, setHasShownProactive] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const prevCaseIdRef = useRef<string | null>(null);
 
-  // Auto-scroll to bottom when new messages
+  // Initialize greeting based on active case
+  const buildGreeting = useCallback((): string => {
+    if (!activeCase) {
+      return "Hello! I'm your MedHero DeepAI Copilot. I have full context of your current case and can help with guideline lookups, evidence searches, appeal drafting, and more. How can I assist?";
+    }
+    const parts: string[] = [];
+    parts.push(`👋 Hello! I'm analyzing your active case:`);
+    parts.push(`\n• **Payer:** ${activeCase.payerName || 'Not set'}`);
+    parts.push(`• **CPT:** ${activeCase.cptCode || 'Not set'}`);
+    parts.push(`• **Case:** "${activeCase.name}"`);
+
+    if (hasResult && approvalScore !== null) {
+      const emoji = approvalScore >= 80 ? '🟢' : approvalScore >= 50 ? '🟡' : '🔴';
+      parts.push(`\n${emoji} **Approval Score:** ${approvalScore}% (${riskLevel} risk)`);
+      if (missingCriteria.length > 0) {
+        parts.push(`\n⚠️ **${missingCriteria.length} criteria missing** — I can help you fix them.`);
+      } else {
+        parts.push(`\n✅ All criteria satisfied — ready for submission!`);
+      }
+    } else if (activeCase.chartNote.trim()) {
+      parts.push(`\n📝 I see you've entered a chart note. Want me to analyze it against ${activeCase.payerName || 'the payer'}'s criteria? Click **Run Audit** or ask me to check specific requirements.`);
+    } else {
+      parts.push(`\n📋 No chart note yet. Select a sample case or create a custom case to get started.`);
+    }
+
+    return parts.join('');
+  }, [activeCase, hasResult, approvalScore, riskLevel, missingCriteria.length]);
+
+  // Reset greeting when case changes or audit completes
+  useEffect(() => {
+    const caseChanged = prevCaseIdRef.current !== activeCase?.id;
+    prevCaseIdRef.current = activeCase?.id ?? null;
+
+    if (caseChanged) {
+      setHasShownProactive(false);
+      setMessages([
+        {
+          id: Date.now(),
+          role: 'assistant',
+          content: buildGreeting(),
+          timestamp: new Date(),
+        },
+      ]);
+    }
+  }, [activeCase?.id, buildGreeting]);
+
+  // Proactive suggestion when audit results change
+  useEffect(() => {
+    if (hasResult && !hasShownProactive && approvalScore !== null) {
+      setHasShownProactive(true);
+      const proactiveMsg = buildProactiveMessage(
+        approvalScore,
+        riskLevel,
+        missingCriteria,
+        payerName,
+        cptCode
+      );
+      if (proactiveMsg) {
+        setTimeout(() => {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: Date.now() + 2,
+              role: 'system',
+              content: proactiveMsg,
+              timestamp: new Date(),
+            },
+          ]);
+        }, 1500);
+      }
+    }
+  }, [hasResult, hasShownProactive, approvalScore, riskLevel, missingCriteria, payerName, cptCode]);
+
+  // Auto-scroll
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -141,14 +339,11 @@ export default function DeepAICopilot() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === ' ') {
-        // Don't trigger when typing in an input/textarea elsewhere
         const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
         if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
-
         e.preventDefault();
         setIsOpen((prev) => {
           if (prev) {
-            // If already open, minimize or close
             setIsMinimized((m) => !m);
             return true;
           }
@@ -156,7 +351,6 @@ export default function DeepAICopilot() {
           return true;
         });
       }
-      // Escape closes
       if (e.key === 'Escape' && isOpen) {
         setIsOpen(false);
         setIsMinimized(false);
@@ -182,23 +376,41 @@ export default function DeepAICopilot() {
       setInputValue('');
       setIsTyping(true);
 
-      // Simulate AI response after 1-2 second delay
-      const delay = 1000 + Math.random() * 1000;
+      const delay = 800 + Math.random() * 800;
       setTimeout(() => {
-        // Check if this is an action hook command
+        // First try case-specific response
+        let response: string | null = null;
+        if (activeCase) {
+          response = generateCaseSpecificResponse(
+            query,
+            payerName,
+            cptCode,
+            procedureName,
+            approvalScore,
+            riskLevel,
+            satisfiedCriteria,
+            missingCriteria,
+            hasResult
+          );
+        }
+
+        // Fall back to basic simulated response
+        if (!response) {
+          response = getBasicSimulatedResponse(query);
+        }
+
+        // Handle action hooks
         const isAction =
           query.toLowerCase().includes('insert') ||
           query.toLowerCase().includes('deepai');
-
         if (isAction && query.toLowerCase().includes('insert')) {
-          // Show toast for action hooks
           showToast('✅ Action: Citation inserted into Section 2');
         }
 
         const aiMsg: Message = {
           id: Date.now() + 1,
           role: 'assistant',
-          content: getSimulatedResponse(query),
+          content: response,
           timestamp: new Date(),
         };
 
@@ -206,7 +418,7 @@ export default function DeepAICopilot() {
         setIsTyping(false);
       }, delay);
     },
-    [inputValue, isTyping]
+    [inputValue, isTyping, activeCase, payerName, cptCode, procedureName, approvalScore, riskLevel, satisfiedCriteria, missingCriteria, hasResult]
   );
 
   const handleSuggestionClick = useCallback(
@@ -225,6 +437,74 @@ export default function DeepAICopilot() {
     },
     [handleSend]
   );
+
+  // Build context-aware suggestion chips
+  const suggestionChips = useMemo(() => {
+    if (!activeCase) return staticSuggestionChips;
+
+    const chips: SuggestionChip[] = [];
+
+    if (!hasResult && activeCase.chartNote.trim()) {
+      chips.push({
+        id: 'case-analyze',
+        icon: <ClipboardCheck size={14} />,
+        label: `Analyze this case against ${payerName}`,
+        query: `What criteria does this case meet for ${payerName} CPT ${cptCode}?`,
+      });
+    }
+
+    if (hasResult && missingCriteria.length > 0) {
+      chips.push({
+        id: 'case-missing',
+        icon: <AlertTriangle size={14} />,
+        label: 'What\'s missing for approval?',
+        query: 'What\'s missing for approval?',
+      });
+      chips.push({
+        id: 'case-fix',
+        icon: <ShieldCheck size={14} />,
+        label: 'How do I fix the denial risk?',
+        query: 'How do I fix the denial risk?',
+      });
+    }
+
+    chips.push({
+      id: 'case-policy',
+      icon: <BookOpen size={14} />,
+      label: `What does ${payerName} require for CPT ${cptCode}?`,
+      query: `What does ${payerName} require for CPT ${cptCode}?`,
+    });
+
+    if (hasResult) {
+      chips.push({
+        id: 'case-score',
+        icon: <Zap size={14} />,
+        label: 'What\'s my approval score?',
+        query: 'What\'s my approval score?',
+      });
+      chips.push({
+        id: 'case-p2p',
+        icon: <MessageSquare size={14} />,
+        label: 'Write a P2P script for this case',
+        query: 'Write a P2P script for this case',
+      });
+      chips.push({
+        id: 'case-letter',
+        icon: <FileText size={14} />,
+        label: 'Generate appeal letter',
+        query: 'Generate appeal letter',
+      });
+    }
+
+    return chips;
+  }, [activeCase, payerName, cptCode, hasResult, missingCriteria.length]);
+
+  // Build context line for the banner
+  const contextLine = activeCase
+    ? `${activeCase.name} — ${payerName} / CPT ${cptCode}${approvalScore !== null ? ` — ${approvalScore}% (${riskLevel})` : ''}`
+    : 'No active case';
+
+  const riskColorClass = riskLevel === 'Low' ? 'text-status-green' : riskLevel === 'Medium' ? 'text-status-orange' : 'text-status-red';
 
   return (
     <>
@@ -270,7 +550,7 @@ export default function DeepAICopilot() {
             }}
             exit={{ opacity: 0, y: 30, scale: 0.95 }}
             transition={{ type: 'spring', stiffness: 350, damping: 28 }}
-            className="fixed bottom-6 right-6 z-50 w-[380px] max-w-[calc(100vw-3rem)]
+            className="fixed bottom-6 right-6 z-50 w-[400px] max-w-[calc(100vw-3rem)]
                        rounded-2xl overflow-hidden shadow-2xl border border-border-light
                        flex flex-col"
             style={{ background: 'rgba(255, 255, 255, 0.98)' }}
@@ -324,13 +604,22 @@ export default function DeepAICopilot() {
                   className="px-4 py-2.5 border-b border-border-light flex items-center gap-2"
                   style={{ background: 'linear-gradient(135deg, #F7F8FA 0%, #EEF2FF 100%)' }}
                 >
-                  <div className="w-1.5 h-1.5 rounded-full bg-status-green animate-pulse" />
+                  <div
+                    className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                      activeCase ? 'bg-status-green' : 'bg-text-secondary/40'
+                    }`}
+                  />
                   <span className="text-[11px] font-medium text-text-secondary">
-                    <span className="text-text-primary font-semibold">Context:</span> Lumbar MRI CPT 72148{' '}
-                    <span className="text-text-secondary mx-1">|</span>{' '}
-                    <span className="text-accent-blue font-semibold">Payer: Aetna</span>{' '}
-                    <span className="text-text-secondary mx-1">|</span>{' '}
-                    <span className="text-status-red font-semibold">Risk: High</span>
+                    <span className="text-text-primary font-semibold">Active Case:</span>{' '}
+                    {contextLine}
+                    {approvalScore !== null && (
+                      <>
+                        <span className="text-text-secondary mx-1">|</span>
+                        <span className={`font-semibold ${riskColorClass}`}>
+                          Risk: {riskLevel}
+                        </span>
+                      </>
+                    )}
                   </span>
                 </div>
 
@@ -346,11 +635,15 @@ export default function DeepAICopilot() {
                         className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
                           msg.role === 'assistant'
                             ? 'bg-accent-blue/10'
+                            : msg.role === 'system'
+                            ? 'bg-status-orange/10'
                             : 'bg-accent-gold/10'
                         }`}
                       >
                         {msg.role === 'assistant' ? (
                           <Bot size={14} className="text-accent-blue" />
+                        ) : msg.role === 'system' ? (
+                          <AlertTriangle size={14} className="text-status-orange" />
                         ) : (
                           <User size={14} className="text-accent-gold" />
                         )}
@@ -362,6 +655,8 @@ export default function DeepAICopilot() {
                           className={`px-3 py-2 rounded-xl text-xs leading-relaxed whitespace-pre-wrap ${
                             msg.role === 'assistant'
                               ? 'bg-white border border-border-light text-text-primary rounded-tl-sm'
+                              : msg.role === 'system'
+                              ? 'bg-status-orange/5 border border-status-orange/20 text-text-primary rounded-tl-sm'
                               : 'bg-accent-blue text-white rounded-tr-sm'
                           }`}
                         >
@@ -397,11 +692,11 @@ export default function DeepAICopilot() {
                   <div ref={messagesEndRef} />
                 </div>
 
-                {/* Suggestion Chips (shown when no user messages yet) */}
-                {messages.length <= 1 && (
+                {/* Suggestion Chips */}
+                {messages.length <= 2 && (
                   <div className="px-4 py-2.5 border-t border-border-light bg-white">
                     <p className="text-[10px] text-text-secondary/60 font-medium mb-2 uppercase tracking-wider">
-                      Suggested Queries
+                      {activeCase ? '💡 Case-Specific Queries' : 'Suggested Queries'}
                     </p>
                     <div className="flex flex-wrap gap-1.5 max-h-[110px] overflow-y-auto">
                       {suggestionChips.map((chip) => (
@@ -432,7 +727,11 @@ export default function DeepAICopilot() {
                       value={inputValue}
                       onChange={(e) => setInputValue(e.target.value)}
                       onKeyDown={handleKeyDown}
-                      placeholder="Ask DeepAI anything..."
+                      placeholder={
+                        activeCase
+                          ? `Ask about ${activeCase.name}...`
+                          : 'Ask DeepAI anything...'
+                      }
                       disabled={isTyping}
                       className="flex-1 px-3 py-2 text-xs rounded-lg border border-border-light
                                  bg-bg-secondary text-text-primary placeholder:text-text-secondary/50
@@ -451,7 +750,7 @@ export default function DeepAICopilot() {
                     </button>
                   </div>
                   <p className="text-[9px] text-text-secondary/40 mt-1.5 text-center">
-                    Press Enter to send • Ctrl+Space to toggle • MedHero DeepAI v2.0
+                    Press Enter to send • Ctrl+Space to toggle • MedHero DeepAI v3.0 (Case-Aware)
                   </p>
                 </div>
               </>
@@ -463,27 +762,48 @@ export default function DeepAICopilot() {
   );
 }
 
-// Global toast function for action hooks
+// ---------------------------------------------------------------------------
+// Proactive message builder
+// ---------------------------------------------------------------------------
+
+function buildProactiveMessage(
+  approvalScore: number,
+  riskLevel: string,
+  missingCriteria: { description: string; recommendedAction: string }[],
+  payerName: string,
+  cptCode: string
+): string | null {
+  if (approvalScore < 50) {
+    return `⚠️ **Proactive Alert:** This case has a **${approvalScore}%** approval score (${riskLevel} risk) for ${payerName} CPT ${cptCode}.\n\nHere's what to fix:\n${missingCriteria.slice(0, 3).map((c) => `• ${c.description} → ${c.recommendedAction}`).join('\n')}\n\nAsk me: "How do I fix the denial risk?" for detailed guidance.`;
+  }
+  if (approvalScore < 80 && missingCriteria.length > 0) {
+    return `⚠️ **Heads up:** ${missingCriteria.length} criteria are missing for ${payerName} CPT ${cptCode}. Your score is ${approvalScore}% (${riskLevel} risk).\n\nTop missing:\n${missingCriteria.slice(0, 2).map((c) => `❌ ${c.description}`).join('\n')}\n\nAsk me: "What's missing for approval?" to see the full list.`;
+  }
+  if (approvalScore >= 80) {
+    return `✅ **This case looks good!** ${approvalScore}% approval likelihood (${riskLevel} risk) for ${payerName} CPT ${cptCode}. All key criteria are satisfied.\n\nWould you like me to **generate the justification letter** or **write a P2P script**?`;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Toast helper
+// ---------------------------------------------------------------------------
+
 function showToast(message: string) {
-  // Create toast element
   const toast = document.createElement('div');
   toast.className =
     'fixed bottom-20 right-6 z-[60] px-4 py-2.5 rounded-xl shadow-2xl text-xs font-semibold text-white animate-slide-up';
   toast.style.background = 'linear-gradient(135deg, #1E5CD4 0%, #0D0F67 100%)';
   toast.textContent = message;
-
-  // Animate in
   toast.style.animation = 'slideUp 0.3s ease-out';
   document.body.appendChild(toast);
 
-  // Remove after 3 seconds
   setTimeout(() => {
     toast.style.opacity = '0';
     toast.style.transition = 'opacity 0.3s ease-out';
     setTimeout(() => toast.remove(), 300);
   }, 3000);
 
-  // Inject keyframe if not present
   if (!document.getElementById('toast-keyframes')) {
     const style = document.createElement('style');
     style.id = 'toast-keyframes';

@@ -343,3 +343,110 @@ export function getPolicy(payerName: string, cptCode: string): PayerPolicy | nul
 export function getAllPolicies(): PayerPolicy[] {
   return Array.from(POLICY_REGISTRY.values());
 }
+
+/**
+ * Generate a generic fallback policy for payer/CPT combos not in the registry.
+ * This allows custom cases to still get a meaningful audit.
+ */
+export function getGenericPolicy(payerName: string, cptCode: string): PayerPolicy {
+  return {
+    payerName,
+    cptCode,
+    procedureName: `Procedure ${cptCode}`,
+    lcdNumber: 'N/A — Custom',
+    criteria: [
+      {
+        id: 'generic-01',
+        description: 'Clinical documentation supports medical necessity',
+        mandatory: true,
+        keywords: [
+          'medical necessity',
+          'indicated',
+          'medically necessary',
+          'clinical indication',
+          'diagnosis',
+          'assessment',
+          'plan',
+          'recommend',
+        ],
+      },
+      {
+        id: 'generic-02',
+        description: 'Appropriate conservative management attempted (if applicable)',
+        mandatory: true,
+        keywords: [
+          'conservative',
+          'physical therapy',
+          'PT',
+          'nsaids',
+          'medication',
+          'injection',
+          'failed',
+          'no relief',
+          'no improvement',
+          'refractory',
+          'unresponsive',
+          'trial',
+        ],
+      },
+      {
+        id: 'generic-03',
+        description: 'Relevant physical examination findings documented',
+        mandatory: true,
+        keywords: [
+          'examination',
+          'physical exam',
+          'tenderness',
+          'range of motion',
+          'strength',
+          'sensation',
+          'reflex',
+          'palpation',
+          'inspection',
+          'auscultation',
+          'vital',
+          'BMI',
+          'weight',
+          'blood pressure',
+        ],
+      },
+      {
+        id: 'generic-04',
+        description: 'Prior relevant imaging or lab results documented',
+        mandatory: false,
+        keywords: [
+          'imaging',
+          'x-ray',
+          'MRI',
+          'CT',
+          'ultrasound',
+          'lab',
+          'laboratory',
+          'BNP',
+          'creatinine',
+          'radiograph',
+          'scan',
+          'echocardiogram',
+          'EKG',
+          'ECG',
+        ],
+      },
+      {
+        id: 'generic-05',
+        description: 'Appropriate follow-up plan documented',
+        mandatory: false,
+        keywords: [
+          'follow-up',
+          'follow up',
+          'plan',
+          'schedule',
+          'refer',
+          'discharge',
+          'monitor',
+          'reassess',
+          'return',
+        ],
+      },
+    ],
+  };
+}

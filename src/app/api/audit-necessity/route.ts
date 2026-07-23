@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPolicy } from '@/lib/policies';
+import { getPolicy, getGenericPolicy } from '@/lib/policies';
 import { evaluateChart } from '@/lib/evaluationEngine';
 
 /**
@@ -41,15 +41,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ---- Policy lookup ----
-    const policy = getPolicy(payerName, cptCode);
-    if (!policy) {
-      return NextResponse.json(
-        {
-          error: `No policy found for payer "${payerName}" and CPT "${cptCode}".`,
-        },
-        { status: 404 }
-      );
-    }
+    const policy = getPolicy(payerName, cptCode) ?? getGenericPolicy(payerName, cptCode);
 
     // ---- Run evaluation ----
     const result = evaluateChart(chartNote.trim(), policy);

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { LogOut, Clock, ArrowLeft } from 'lucide-react';
+import { CaseProvider } from '@/lib/useCaseState';
 import Navbar from '@/components/Navbar';
 import GuidelineSyncBar from '@/components/GuidelineSyncBar';
 import SplitScreenContainer from '@/components/HUD/SplitScreenContainer';
@@ -120,7 +121,9 @@ export default function WorkspacePage() {
 
       {/* Main Content: offset for fixed navbar (64px) + sync bar (40px) + auth header (~36px) */}
       <main className="flex-1 pt-[140px] pb-4 px-4 sm:px-6 lg:px-8 max-w-screen-2xl mx-auto w-full">
-        <SplitScreenContainer />
+        <CaseProvider>
+          <SplitScreenContainer />
+        </CaseProvider>
       </main>
 
       <Footer />
