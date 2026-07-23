@@ -23,6 +23,12 @@ import RetroPAMode from '@/components/HUD/RetroPAMode';
 import PortalSSOVault from '@/components/HUD/PortalSSOVault';
 import AudioBrief from '@/components/HUD/AudioBrief';
 import CopayMatcher from '@/components/HUD/CopayMatcher';
+import AntiAIDenial from '@/components/HUD/AntiAIDenial';
+import GoldCardTracker from '@/components/HUD/GoldCardTracker';
+import DOIComplaint from '@/components/HUD/DOIComplaint';
+import FHIRClient from '@/components/HUD/FHIRClient';
+import RevenuePrioritizer from '@/components/HUD/RevenuePrioritizer';
+import P2PCalendar from '@/components/HUD/P2PCalendar';
 
 // ---------------------------------------------------------------------------
 // Types — mirrored from the evaluation engine & API
@@ -121,6 +127,15 @@ export default function SplitScreenContainer() {
   const [isPortalSSOVaultOpen, setIsPortalSSOVaultOpen] = useState(false);
   const [isAudioBriefOpen, setIsAudioBriefOpen] = useState(false);
   const [isCopayMatcherOpen, setIsCopayMatcherOpen] = useState(false);
+
+  // ---- Regulatory & Legal Power-Tools State ---------------------------------
+  const [isRegulatoryExpanded, setIsRegulatoryExpanded] = useState(false);
+  const [isAntiAIDenialOpen, setIsAntiAIDenialOpen] = useState(false);
+  const [isGoldCardTrackerOpen, setIsGoldCardTrackerOpen] = useState(false);
+  const [isDOIComplaintOpen, setIsDOIComplaintOpen] = useState(false);
+  const [isFHIRClientOpen, setIsFHIRClientOpen] = useState(false);
+  const [isRevenuePrioritizerOpen, setIsRevenuePrioritizerOpen] = useState(false);
+  const [isP2PCalendarOpen, setIsP2PCalendarOpen] = useState(false);
 
   // ---- Handlers -----------------------------------------------------------
 
@@ -618,6 +633,130 @@ export default function SplitScreenContainer() {
                   </div>
                 </div>
               </div>
+
+              {/* ---- ⚖️ Regulatory & Legal Power-Tools ---- */}
+              <div className="border-t border-border-light mt-2 pt-2">
+                <button
+                  onClick={() => setIsRegulatoryExpanded((prev) => !prev)}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg
+                             hover:bg-status-red/5 transition-colors duration-200 group"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="p-1 rounded bg-status-red/10">
+                      <span className="text-sm">⚖️</span>
+                    </div>
+                    <span className="text-xs font-semibold text-text-primary">
+                      ⚖️ Regulatory &amp; Legal Power-Tools
+                    </span>
+                  </div>
+                  {isRegulatoryExpanded ? (
+                    <ChevronUp size={14} className="text-text-secondary group-hover:text-text-primary transition-colors" />
+                  ) : (
+                    <ChevronDown size={14} className="text-text-secondary group-hover:text-text-primary transition-colors" />
+                  )}
+                </button>
+
+                {/* Expandable Grid */}
+                <div
+                  className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                    isRegulatoryExpanded ? 'max-h-[1200px] opacity-100 mt-2' : 'max-h-0 opacity-0'
+                  }`}
+                >
+                  <div className="px-3 pb-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      {/* Tool 1: Anti-AI Denial */}
+                      <button
+                        onClick={() => setIsAntiAIDenialOpen(true)}
+                        className="rounded-lg border border-status-red/20 bg-status-red/3 p-2.5 text-left
+                                   hover:border-status-red/40 hover:bg-status-red/5 transition-all duration-200 group"
+                      >
+                        <span className="text-base">🛡️</span>
+                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
+                          Anti-AI Denial Countermeasure
+                        </p>
+                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
+                          CMS-0057-F algorithmic audit
+                        </p>
+                      </button>
+
+                      {/* Tool 2: Gold-Card Tracker */}
+                      <button
+                        onClick={() => setIsGoldCardTrackerOpen(true)}
+                        className="rounded-lg border border-accent-gold/20 bg-accent-gold/3 p-2.5 text-left
+                                   hover:border-accent-gold/40 hover:bg-accent-gold/5 transition-all duration-200 group"
+                      >
+                        <span className="text-base">🏆</span>
+                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
+                          Gold-Card Exemption Tracker
+                        </p>
+                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
+                          TX, WV, LA statutory exemptions
+                        </p>
+                      </button>
+
+                      {/* Tool 3: DOI Complaint */}
+                      <button
+                        onClick={() => setIsDOIComplaintOpen(true)}
+                        className="rounded-lg border border-status-red/20 bg-status-red/3 p-2.5 text-left
+                                   hover:border-status-red/40 hover:bg-status-red/5 transition-all duration-200 group"
+                      >
+                        <span className="text-base">🚀</span>
+                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
+                          DOI Complaint Escalator
+                        </p>
+                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
+                          Instant regulatory filing
+                        </p>
+                      </button>
+
+                      {/* Tool 4: FHIR ePA Client */}
+                      <button
+                        onClick={() => setIsFHIRClientOpen(true)}
+                        className="rounded-lg border border-accent-blue/20 bg-accent-blue/3 p-2.5 text-left
+                                   hover:border-accent-blue/40 hover:bg-accent-blue/5 transition-all duration-200 group"
+                      >
+                        <span className="text-base">🔗</span>
+                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
+                          FHIR Da Vinci ePA Client
+                        </p>
+                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
+                          CRD / DTR / PAS engine
+                        </p>
+                      </button>
+
+                      {/* Tool 5: Revenue Prioritizer */}
+                      <button
+                        onClick={() => setIsRevenuePrioritizerOpen(true)}
+                        className="rounded-lg border border-accent-gold/20 bg-accent-gold/3 p-2.5 text-left
+                                   hover:border-accent-gold/40 hover:bg-accent-gold/5 transition-all duration-200 group"
+                      >
+                        <span className="text-base">💰</span>
+                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
+                          Revenue-at-Risk Prioritizer
+                        </p>
+                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
+                          Sorted by financial impact
+                        </p>
+                      </button>
+
+                      {/* Tool 6: P2P Calendar */}
+                      <button
+                        onClick={() => setIsP2PCalendarOpen(true)}
+                        className="rounded-lg border border-status-green/20 bg-status-green/3 p-2.5 text-left
+                                   hover:border-status-green/40 hover:bg-status-green/5 transition-all duration-200 group"
+                      >
+                        <span className="text-base">📅</span>
+                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
+                          P2P Calendar Concierge
+                        </p>
+                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
+                          1-click booking + battle card
+                        </p>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -687,6 +826,37 @@ export default function SplitScreenContainer() {
         onClose={() => setIsCopayMatcherOpen(false)}
         cptCode={cptCode}
         procedureName={evalResult?.procedureName}
+      />
+
+      {/* ---- ⚖️ Regulatory & Legal Power-Tools Modals ---- */}
+      <AntiAIDenial
+        isOpen={isAntiAIDenialOpen}
+        onClose={() => setIsAntiAIDenialOpen(false)}
+      />
+
+      <GoldCardTracker
+        isOpen={isGoldCardTrackerOpen}
+        onClose={() => setIsGoldCardTrackerOpen(false)}
+      />
+
+      <DOIComplaint
+        isOpen={isDOIComplaintOpen}
+        onClose={() => setIsDOIComplaintOpen(false)}
+      />
+
+      <FHIRClient
+        isOpen={isFHIRClientOpen}
+        onClose={() => setIsFHIRClientOpen(false)}
+      />
+
+      <RevenuePrioritizer
+        isOpen={isRevenuePrioritizerOpen}
+        onClose={() => setIsRevenuePrioritizerOpen(false)}
+      />
+
+      <P2PCalendar
+        isOpen={isP2PCalendarOpen}
+        onClose={() => setIsP2PCalendarOpen(false)}
       />
     </>
   );
