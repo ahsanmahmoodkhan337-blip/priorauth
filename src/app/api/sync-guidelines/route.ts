@@ -25,7 +25,7 @@ export async function POST() {
         sync_status: 'completed',
       }).then(({ error }) => {
         if (error) console.warn('[sync-guidelines] Failed to save sync log:', error.message);
-      }).catch((err) => {
+      }, (err: unknown) => {
         console.warn('[sync-guidelines] Error saving sync log to Supabase:', err);
       });
     }

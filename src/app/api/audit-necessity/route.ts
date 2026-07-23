@@ -149,7 +149,7 @@ Keep the entire response under 300 words. Be specific and cite details from the 
         // Fire-and-forget — don't block the response
         client.from('audit_results').insert(auditRow).then(({ error }) => {
           if (error) console.warn('[audit-necessity] Failed to save audit result:', error.message);
-        }).catch((err) => {
+        }, (err: unknown) => {
           console.warn('[audit-necessity] Error saving audit result to Supabase:', err);
         });
       }
