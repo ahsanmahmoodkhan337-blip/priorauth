@@ -13,7 +13,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const req = getRequestByPhone(phone.trim());
+    const req = await getRequestByPhone(phone.trim());
 
     if (!req) {
       return NextResponse.json(

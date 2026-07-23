@@ -4,11 +4,7 @@ import { getAllRequests, updateRequest } from '@/lib/serverStore';
 // GET /api/admin/requests — returns all requests sorted newest first
 export async function GET() {
   try {
-    const requests = getAllRequests();
-    // Sort by submittedAt descending (newest first)
-    requests.sort(
-      (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
-    );
+    const requests = await getAllRequests();
     return NextResponse.json(requests);
   } catch (error) {
     console.error('Admin GET requests error:', error);
@@ -46,7 +42,7 @@ export async function PATCH(request: Request) {
         : 7;
       const expiresAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
 
-      const updated = updateRequest(id, {
+      const updated = await updateRequest(id, {
         status: 'approved',
         approvedAt: now.toISOString(),
         expiresAt: expiresAt.toISOString(),
@@ -64,7 +60,7 @@ export async function PATCH(request: Request) {
     }
 
     // Rejected
-    const updated = updateRequest(id, { status: 'rejected' });
+    const updated = await updateRequest(id, { status: 'rejected' });
 
     if (!updated) {
       return NextResponse.json(
