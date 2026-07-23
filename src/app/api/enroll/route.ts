@@ -40,7 +40,7 @@ export async function POST(request: Request) {
       submittedAt: new Date().toISOString(),
     };
 
-    saveRequest(newRequest);
+    await saveRequest(newRequest);
 
     return NextResponse.json(
       { success: true, message: 'Access request submitted successfully' },
