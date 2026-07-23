@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import LandingNavbar from '@/components/LandingNavbar';
 import Footer from '@/components/Footer';
+import { saveAccessRequest } from '@/lib/accessRequests';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -175,10 +176,16 @@ export default function LandingPage() {
 
       if (!validate()) return;
 
-      // For now, just log the data — API routes come later
-      console.log('Access Request Submitted:', {
-        ...formData,
-        selectedPaymentMethod: selectedPayment,
+      // Save to localStorage for admin panel
+      saveAccessRequest({
+        id: crypto.randomUUID(),
+        fullName: formData.fullName.trim(),
+        phone: formData.phone.trim(),
+        email: formData.email.trim() || '',
+        paymentMethod: formData.paymentMethod as 'bank-islami' | 'easypaisa' | 'paypal',
+        transactionId: formData.transactionId.trim(),
+        receiptSent: formData.receiptSent === true,
+        status: 'pending',
         submittedAt: new Date().toISOString(),
       });
 

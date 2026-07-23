@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
+import Link from 'next/link';
 import ModeToggle from '@/components/HUD/ModeToggle';
 import { Shield } from 'lucide-react';
 
@@ -42,13 +43,13 @@ export default function LandingNavbar() {
           {/* Right: Mode Toggle + Admin Panel link */}
           <div className="flex items-center gap-4 sm:gap-6">
             <ModeToggle mode={mode} onToggle={handleToggleMode} />
-            <a
-              href="#"
+            <Link
+              href="/admin"
               className="text-xs font-medium text-text-secondary hover:text-accent-blue transition-colors flex items-center gap-1"
             >
               <Shield size={12} />
               <span>Admin Panel</span>
-            </a>
+            </Link>
           </div>
         </div>
       </div>
