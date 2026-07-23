@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { X, Play, Copy, CheckCircle2, Volume2, FileText, RefreshCw } from 'lucide-react';
+import { useCaseState } from '@/lib/useCaseState';
+import NoActiveCaseMessage from './NoActiveCaseMessage';
 
 // ---------------------------------------------------------------------------
 // Sample P2P Scripts
@@ -77,17 +79,53 @@ interface AudioBriefProps {
 // ---------------------------------------------------------------------------
 
 export default function AudioBrief({ isOpen, onClose }: AudioBriefProps) {
+  const { activeCase } = useCaseState();
   const [selectedScript, setSelectedScript] = useState<BriefScript | null>(null);
   const [copied, setCopied] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
 
   const handleGenerate = useCallback(() => {
-    // Simulate generating a script from current audit data
-    const randomIdx = Math.floor(Math.random() * SAMPLE_SCRIPTS.length);
-    setSelectedScript(SAMPLE_SCRIPTS[randomIdx]);
+    if (!activeCase) return;
+
+    // Build script from active case data
+    const auditResult = activeCase.auditResult;
+    const keyPoints: string[] = [];
+    const satisfied = auditResult?.satisfiedCriteria ?? [];
+    const missing = auditResult?.missingCriteria ?? [];
+
+    if (satisfied.length > 0) {
+      keyPoints.push(`${satisfied.length} criteria met — ${satisfied.map(s => s.description).join(', ')}`);
+    }
+    if (missing.length > 0) {
+      keyPoints.push(`${missing.length} criteria need attention: ${missing.map(m => m.description).join(', ')}`);
+    }
+    if (keyPoints.length === 0) {
+      keyPoints.push('Review all payer requirements before the P2P call');
+    }
+
+    const scriptContent = [
+      `Doctor, you are speaking with ${activeCase.payerName || 'the payer'} regarding the ${auditResult?.procedureName || 'procedure'} (CPT ${activeCase.cptCode || 'N/A'}).`,
+      `Current approval likelihood: ${auditResult?.approvalScore ?? '??'}%.`,
+      `Key evidence points: ${keyPoints.join('; ')}.`,
+      `Reference: ${activeCase.payerName || 'Payer'} LCD for CPT ${activeCase.cptCode || 'N/A'}.`,
+      'Be prepared to cite clinical guidelines and emphasize medical necessity. Good luck!',
+    ].join(' ');
+
+    const brief: BriefScript = {
+      doctorName: 'Provider',
+      payerName: activeCase.payerName || 'Unknown Payer',
+      patientName: 'Patient',
+      procedureName: auditResult?.procedureName || activeCase.name || 'Procedure',
+      cptCode: activeCase.cptCode || 'N/A',
+      keyPoints,
+      policyReference: `${activeCase.payerName || 'Payer'} LCD — CPT ${activeCase.cptCode || 'N/A'}`,
+      script: scriptContent,
+    };
+
+    setSelectedScript(brief);
     setCopied(false);
     setIsPlaying(false);
-  }, []);
+  }, [activeCase]);
 
   const handleCopy = useCallback(() => {
     if (!selectedScript) return;
@@ -108,6 +146,28 @@ export default function AudioBrief({ isOpen, onClose }: AudioBriefProps) {
   }, [selectedScript]);
 
   if (!isOpen) return null;
+
+  // No active case
+  if (!activeCase) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border-light bg-gradient-to-r from-status-green/5 to-accent-blue/5">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-status-green/10">
+                <span className="text-xl">🎧</span>
+              </div>
+              <h2 className="text-lg font-semibold text-heading-navy">Generate 60-Sec Doctor Audio Brief</h2>
+            </div>
+            <button onClick={onClose} className="p-2 rounded-lg hover:bg-black/5 transition-colors">
+              <X size={18} className="text-text-secondary" />
+            </button>
+          </div>
+          <NoActiveCaseMessage />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">

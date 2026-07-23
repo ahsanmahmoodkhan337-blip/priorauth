@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import { X, Search, ExternalLink, DollarSign, CheckCircle2, AlertCircle, Download, Users } from 'lucide-react';
+import { useCaseState } from '@/lib/useCaseState';
+import NoActiveCaseMessage from './NoActiveCaseMessage';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -108,7 +110,10 @@ interface CopayMatcherProps {
 // ---------------------------------------------------------------------------
 
 export default function CopayMatcher({ isOpen, onClose, cptCode, procedureName }: CopayMatcherProps) {
-  const [searchDrug, setSearchDrug] = useState(cptCode ?? 'Humira');
+  const { activeCase } = useCaseState();
+  const effectiveCpt = activeCase?.cptCode || cptCode || '';
+  const effectiveProc = activeCase?.auditResult?.procedureName || procedureName || '';
+  const [searchDrug, setSearchDrug] = useState(effectiveCpt || 'Humira');
   const [hasSearched, setHasSearched] = useState(false);
   const [eligiblePrograms, setEligiblePrograms] = useState<AssistanceProgram[]>([]);
   const [checkingEligibility, setCheckingEligibility] = useState<string | null>(null);
@@ -182,6 +187,28 @@ ${program.enrollmentLink}`;
   };
 
   if (!isOpen) return null;
+
+  // No active case and no props
+  if (!activeCase && !cptCode) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border-light bg-gradient-to-r from-accent-gold/5 to-accent-blue/5">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-accent-gold/10">
+                <DollarSign size={20} className="text-accent-gold" />
+              </div>
+              <h2 className="text-lg font-semibold text-heading-navy">Copay Assistance Program Matcher</h2>
+            </div>
+            <button onClick={onClose} className="p-2 rounded-lg hover:bg-black/5 transition-colors">
+              <X size={18} className="text-text-secondary" />
+            </button>
+          </div>
+          <NoActiveCaseMessage />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">

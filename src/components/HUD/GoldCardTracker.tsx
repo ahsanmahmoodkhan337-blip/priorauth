@@ -2,6 +2,8 @@
 
 import React, { useState, useCallback } from 'react';
 import { X, Trophy, TrendingUp, FileText, CheckCircle2, Calendar, Star, Copy } from 'lucide-react';
+import { useCaseState } from '@/lib/useCaseState';
+import NoActiveCaseMessage from './NoActiveCaseMessage';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -136,6 +138,7 @@ function getRateColor(rate: number): string {
 // ---------------------------------------------------------------------------
 
 export default function GoldCardTracker({ isOpen, onClose }: GoldCardTrackerProps) {
+  const { activeCase } = useCaseState();
   const [selectedLedger, setSelectedLedger] = useState<ProviderLedger | null>(null);
   const [generatedLetter, setGeneratedLetter] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -198,6 +201,23 @@ NPI: ${ledger.npi}`;
   }, []);
 
   if (!isOpen) return null;
+
+  // No active case — show message
+  if (!activeCase) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border-light bg-gradient-to-r from-bg-navy/5 to-accent-gold/5">
+            <h2 className="text-lg font-semibold text-heading-navy">Regulatory Tool</h2>
+            <button onClick={onClose} className="p-2 rounded-lg hover:bg-black/5 transition-colors">
+              <X size={18} className="text-text-secondary" />
+            </button>
+          </div>
+          <NoActiveCaseMessage />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">

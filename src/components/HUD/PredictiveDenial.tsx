@@ -2,6 +2,8 @@
 
 import React, { useState, useCallback } from 'react';
 import { X, Shield, AlertTriangle, TrendingUp, ChevronDown, ChevronUp, Target } from 'lucide-react';
+import { useCaseState } from '@/lib/useCaseState';
+import NoActiveCaseMessage from './NoActiveCaseMessage';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -204,34 +206,49 @@ function RiskGauge({ probability, colors }: { probability: number; colors: Retur
 // ---------------------------------------------------------------------------
 
 export default function PredictiveDenial({ isOpen, onClose, payerName, cptCode }: PredictiveDenialProps) {
+  const { activeCase } = useCaseState();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<RiskBreakdown | null>(null);
   const [expandedFlags, setExpandedFlags] = useState<Set<string>>(new Set());
+
+  // Use active case data, falling back to props
+  const effectivePayer = activeCase?.payerName || payerName || null;
+  const effectiveCptCode = activeCase?.cptCode || cptCode || null;
+  const chartNote = activeCase?.chartNote ?? null;
 
   const handleAnalyze = useCallback(() => {
     setIsAnalyzing(true);
     setResult(null);
 
+    // If there's an audit result, use its approval score to influence risk
+    const auditScore = activeCase?.auditResult?.approvalScore;
+
     setTimeout(() => {
-      const { flags, policyNumber } = getRiskFlags(payerName);
+      const { flags, policyNumber } = getRiskFlags(effectivePayer);
       const highCount = flags.filter((f) => f.severity === 'high').length;
       const mediumCount = flags.filter((f) => f.severity === 'medium').length;
 
-      // Simulate probability based on flag counts
-      const probability = Math.min(95, highCount * 25 + mediumCount * 12 + Math.floor(Math.random() * 10));
+      // Simulate probability based on flag counts, influenced by actual audit score
+      let probability: number;
+      if (auditScore !== undefined && auditScore !== null) {
+        // Invert audit score: high approval = low denial risk
+        probability = Math.max(5, 100 - auditScore + Math.floor(Math.random() * 10) - 5);
+      } else {
+        probability = Math.min(95, highCount * 25 + mediumCount * 12 + Math.floor(Math.random() * 10));
+      }
       const riskLevel = probability >= 70 ? 'High' : probability >= 40 ? 'Medium' : 'Low';
 
       setResult({
         riskProbability: probability,
         riskLevel,
         flags,
-        payerName: payerName || 'Blue Cross Blue Shield',
+        payerName: effectivePayer || 'Blue Cross Blue Shield',
         policyNumber,
         scannedAt: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
       });
       setIsAnalyzing(false);
     }, 1500);
-  }, [payerName]);
+  }, [effectivePayer, activeCase]);
 
   const toggleFlag = useCallback((id: string) => {
     setExpandedFlags((prev) => {
@@ -243,6 +260,28 @@ export default function PredictiveDenial({ isOpen, onClose, payerName, cptCode }
   }, []);
 
   if (!isOpen) return null;
+
+  // No active case and no props
+  if (!activeCase && !payerName) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border-light bg-gradient-to-r from-status-red/5 to-accent-gold/5">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-status-red/10">
+                <Shield size={20} className="text-status-red" />
+              </div>
+              <h2 className="text-lg font-semibold text-heading-navy">Predictive Denial Risk Engine</h2>
+            </div>
+            <button onClick={onClose} className="p-2 rounded-lg hover:bg-black/5 transition-colors">
+              <X size={18} className="text-text-secondary" />
+            </button>
+          </div>
+          <NoActiveCaseMessage />
+        </div>
+      </div>
+    );
+  }
 
   const colors = result ? getRiskColor(result.riskProbability) : getRiskColor(87);
 
@@ -268,16 +307,16 @@ export default function PredictiveDenial({ isOpen, onClose, payerName, cptCode }
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
           {/* Payer / CPT info */}
-          {(payerName || cptCode) && (
+          {(effectivePayer || effectiveCptCode) && (
             <div className="flex items-center gap-3 text-xs text-text-secondary">
-              {payerName && (
+              {effectivePayer && (
                 <span className="px-3 py-1 rounded-full bg-accent-blue/10 text-accent-blue font-semibold">
-                  {payerName}
+                  {effectivePayer}
                 </span>
               )}
-              {cptCode && (
+              {effectiveCptCode && (
                 <span className="px-3 py-1 rounded-full bg-accent-gold/10 text-heading-navy font-semibold">
-                  CPT {cptCode}
+                  CPT {effectiveCptCode}
                 </span>
               )}
             </div>

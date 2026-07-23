@@ -2,9 +2,11 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Clock, AlertTriangle, Scale } from 'lucide-react';
+import { useCaseState } from '@/lib/useCaseState';
+import NoActiveCaseMessage from './NoActiveCaseMessage';
 
 interface StatuteClockProps {
-  /** The date the denial was issued or the submission was made. Defaults to today. */
+  /** The date the denial was issued or the submission was made. Falls back to active case createdAt. */
   denialDate?: string | null;
   compact?: boolean;
 }
@@ -40,22 +42,24 @@ function bgClass(days: number): string {
   return 'bg-status-green/10 border-status-green/30';
 }
 
-function badgeColorClass(days: number): string {
-  if (days <= 3) return 'bg-status-red text-white';
-  if (days < 7) return 'bg-status-red/20 text-status-red';
-  if (days <= 14) return 'bg-status-orange/20 text-status-orange';
-  return 'bg-status-green/20 text-status-green';
-}
-
 export default function StatuteClock({
   denialDate,
   compact = false,
 }: StatuteClockProps) {
-  const effectiveDate = denialDate || new Date().toISOString().slice(0, 10);
+  const { activeCase } = useCaseState();
+
+  // Use active case's createdAt as the reference date, fallback to prop, then today
+  const effectiveDate = (() => {
+    if (denialDate) return denialDate;
+    if (activeCase?.createdAt) {
+      return new Date(activeCase.createdAt).toISOString().slice(0, 10);
+    }
+    return new Date().toISOString().slice(0, 10);
+  })();
+
   const [remaining, setRemaining] = useState<TimeRemaining>(() => computeRemaining(effectiveDate));
 
   useEffect(() => {
-    // Update every second for live countdown feel
     const interval = setInterval(() => {
       setRemaining(computeRemaining(effectiveDate));
     }, 1000);
@@ -64,6 +68,22 @@ export default function StatuteClock({
 
   const erisaFlashing = remaining.erisaDays <= 3;
   const stateFlashing = remaining.stateDays <= 3;
+
+  // No active case and no explicit denial date
+  if (!activeCase && !denialDate) {
+    if (compact) {
+      return (
+        <div className="space-y-1 text-[9px] text-[#69727D] text-center py-2">
+          No active case — select a case to track deadlines.
+        </div>
+      );
+    }
+    return (
+      <div className="glass-card p-4">
+        <NoActiveCaseMessage variant="inline" />
+      </div>
+    );
+  }
 
   if (compact) {
     return (

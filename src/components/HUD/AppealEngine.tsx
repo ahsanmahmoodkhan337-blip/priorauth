@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { X, ChevronRight, CheckCircle2, Clock, AlertCircle, FileText, ExternalLink, Calendar } from 'lucide-react';
+import { useCaseState } from '@/lib/useCaseState';
+import NoActiveCaseMessage from './NoActiveCaseMessage';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -89,8 +91,81 @@ interface AppealEngineProps {
 // ---------------------------------------------------------------------------
 
 export default function AppealEngine({ isOpen, onClose }: AppealEngineProps) {
-  const [appealCase, setAppealCase] = useState<AppealCase>(INITIAL_CASE);
+  const { activeCase } = useCaseState();
+
+  // Build appeal case from active case data
+  const initialCase = useMemo((): AppealCase => {
+    if (!activeCase) {
+      return {
+        caseId: 'APL-000-000',
+        patientName: '—',
+        procedureName: '—',
+        cptCode: '—',
+        payerName: '—',
+        currentLevel: 1,
+        levels: [],
+      };
+    }
+
+    const audit = activeCase.auditResult;
+    const baseDesc = audit?.procedureName || activeCase.name || 'Procedure';
+    const cpt = activeCase.cptCode || 'N/A';
+    const payer = activeCase.payerName || 'Unknown Payer';
+    const caseId = `APL-${activeCase.id.slice(-8).toUpperCase()}`;
+
+    return {
+      caseId,
+      patientName: 'Patient',
+      procedureName: baseDesc,
+      cptCode: cpt,
+      payerName: payer,
+      currentLevel: 1,
+      levels: [
+        {
+          level: 1,
+          title: 'Level 1: Initial Reconsideration',
+          subtitle: 'Peer-to-Peer Review Request',
+          status: 'active' as AppealStatus,
+          deadline: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+          templateName: 'Standard Reconsideration Letter (CMS-20027)',
+          templatePreview: audit
+            ? `Requesting reconsideration for CPT ${cpt} (${baseDesc}). Current approval score: ${audit.approvalScore}%. ${audit.missingCriteria.length} criteria need attention. ${audit.missingCriteria.map(m => m.recommendedAction).join(' ')}`
+            : `Requesting reconsideration for CPT ${cpt} (${baseDesc}). Run an audit to populate the evidence base.`,
+          isCurrent: true,
+        },
+        {
+          level: 2,
+          title: 'Level 2: Medical Director Appeal',
+          subtitle: 'Formal Appeal with Clinical Evidence',
+          status: 'pending' as AppealStatus,
+          deadline: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+          templateName: 'Medical Director Appeal — Evidence Package',
+          templatePreview: audit
+            ? `Formal appeal for CPT ${cpt}. ${audit.satisfiedCriteria.length} criteria met. Supporting evidence from ${payer} LCD.`
+            : `Formal appeal for CPT ${cpt}. Run an audit to generate evidence.`,
+          isCurrent: false,
+        },
+        {
+          level: 3,
+          title: 'Level 3: Independent Review Organization',
+          subtitle: 'External IRO Appeal (Final)',
+          status: 'pending' as AppealStatus,
+          deadline: new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+          templateName: 'IRO External Review Request — MAXIMUS',
+          templatePreview: `Pursuant to ERISA §503 and PPACA §2719, requesting independent external review for CPT ${cpt} (${baseDesc}). Treating physician certifies delay would jeopardize patient health.`,
+          isCurrent: false,
+        },
+      ],
+    };
+  }, [activeCase]);
+
+  const [appealCase, setAppealCase] = useState<AppealCase>(initialCase);
   const [selectedLevel, setSelectedLevel] = useState<number | null>(null);
+
+  // Sync when active case changes
+  useState(() => {
+    setAppealCase(initialCase);
+  });
 
   const getStatusIcon = (status: AppealStatus) => {
     switch (status) {
@@ -136,6 +211,40 @@ export default function AppealEngine({ isOpen, onClose }: AppealEngineProps) {
   };
 
   if (!isOpen) return null;
+
+  // No active case
+  if (!activeCase || !activeCase.auditResult) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border-light bg-gradient-to-r from-accent-gold/5 to-bg-navy/5">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-accent-gold/10">
+                <span className="text-xl">📋</span>
+              </div>
+              <h2 className="text-lg font-semibold text-heading-navy">Multi-Tier Appeal Engine</h2>
+            </div>
+            <button onClick={onClose} className="p-2 rounded-lg hover:bg-black/5 transition-colors">
+              <X size={18} className="text-text-secondary" />
+            </button>
+          </div>
+          {activeCase ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center px-8">
+              <div className="mb-4 p-4 rounded-full bg-gray-50 border border-gray-200">
+                <FileText size={36} className="text-gray-400" />
+              </div>
+              <h3 className="text-base font-semibold text-[#111827] mb-2">No audit result available</h3>
+              <p className="text-sm text-[#69727D] max-w-sm">
+                Run an audit on your active case first to populate appeal data and evidence packages.
+              </p>
+            </div>
+          ) : (
+            <NoActiveCaseMessage />
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">

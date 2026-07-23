@@ -3,6 +3,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FileText, Download, Send, X, Printer, Shield, Check } from 'lucide-react';
+import { useCaseState } from '@/lib/useCaseState';
+import NoActiveCaseMessage from './NoActiveCaseMessage';
 
 interface FaxPacketAssemblerProps {
   isOpen: boolean;
@@ -25,7 +27,17 @@ export default function FaxPacketAssembler({
   satisfiedCriteria,
   lcdNumber,
 }: FaxPacketAssemblerProps) {
+  const { activeCase } = useCaseState();
   const [toast, setToast] = useState<string | null>(null);
+
+  // Use active case data, falling back to props
+  const effectiveLetter = letter || activeCase?.auditResult?.justificationLetter || '';
+  const effectivePayer = payerName || activeCase?.payerName || 'N/A';
+  const effectiveCpt = cptCode || activeCase?.cptCode || 'N/A';
+  const effectiveProc = procedureName || activeCase?.auditResult?.procedureName || 'N/A';
+  const effectiveCriteria = satisfiedCriteria.length > 0
+    ? satisfiedCriteria
+    : (activeCase?.auditResult?.satisfiedCriteria ?? []).map(c => ({ id: c.id, description: c.description }));
 
   useEffect(() => {
     if (isOpen) {
@@ -44,25 +56,47 @@ export default function FaxPacketAssembler({
     setTimeout(() => setToast(null), 3000);
   }, []);
 
+  // No active case and no props
+  if (isOpen && !activeCase && !letter) {
+    return (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+        <div className="glass-card w-full max-w-2xl shadow-2xl">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border-light">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-md bg-accent-gold/10">
+                <Printer size={16} className="text-accent-gold" />
+              </div>
+              <h2 className="text-sm font-semibold text-text-primary">📄 Compile HIPAA e-Fax Packet</h2>
+            </div>
+            <button onClick={onClose} className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-gray-100 transition-colors">
+              <X size={18} />
+            </button>
+          </div>
+          <NoActiveCaseMessage />
+        </div>
+      </div>
+    );
+  }
+
   const handleDownload = useCallback(() => {
     const sections = [
       '=== HIPAA COMPLIANT COVER SHEET ===',
       `Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`,
       `Patient ID: [REDACTED]`,
-      `Payer: ${payerName || 'N/A'}`,
-      `CPT: ${cptCode || 'N/A'}`,
-      `Procedure: ${procedureName || 'N/A'}`,
+      `Payer: ${effectivePayer}`,
+      `CPT: ${effectiveCpt}`,
+      `Procedure: ${effectiveProc}`,
       '',
       '=== MEDICAL NECESSITY JUSTIFICATION LETTER ===',
-      letter || 'No letter available. Run an audit first.',
+      effectiveLetter || 'No letter available. Run an audit first.',
       '',
       '=== PAYER EVIDENCE BINDER ===',
-      ...satisfiedCriteria.map((c, i) => `✓ Criterion ${i + 1}: ${c.description}`),
+      ...effectiveCriteria.map((c, i) => `✓ Criterion ${i + 1}: ${c.description}`),
       '',
       `=== LCD/NCD POLICY CITATION APPENDIX ===`,
-      `Payer: ${payerName || 'N/A'}`,
+      `Payer: ${effectivePayer}`,
       `LCD Number: ${lcdNumber || 'N/A'}`,
-      `Criteria count: ${satisfiedCriteria.length}`,
+      `Criteria count: ${effectiveCriteria.length}`,
       '',
       '--- END OF HIPAA e-FAX PACKET ---',
     ].join('\n');
@@ -71,13 +105,13 @@ export default function FaxPacketAssembler({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `HIPAA-eFax-Packet-${payerName || 'Unknown'}-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.download = `HIPAA-eFax-Packet-${effectivePayer}-${new Date().toISOString().slice(0, 10)}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     showToast('PDF packet compiled successfully');
-  }, [letter, payerName, cptCode, procedureName, satisfiedCriteria, lcdNumber, showToast]);
+  }, [effectiveLetter, effectivePayer, effectiveCpt, effectiveProc, effectiveCriteria, lcdNumber, showToast]);
 
   const handleEFax = useCallback(() => {
     showToast('e-Fax transmission queued');
@@ -154,15 +188,15 @@ export default function FaxPacketAssembler({
                   </div>
                   <div className="flex justify-between">
                     <span className="text-text-primary/60">Payer:</span>
-                    <span className="text-text-primary font-medium">{payerName || 'N/A'}</span>
+                    <span className="text-text-primary font-medium">{effectivePayer}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-text-primary/60">CPT Code:</span>
-                    <span className="text-text-primary font-medium">{cptCode || 'N/A'}</span>
+                    <span className="text-text-primary font-medium">{effectiveCpt}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-text-primary/60">Procedure:</span>
-                    <span className="text-text-primary font-medium">{procedureName || 'N/A'}</span>
+                    <span className="text-text-primary font-medium">{effectiveProc}</span>
                   </div>
                 </div>
                 {/* Simulated barcode */}
@@ -192,7 +226,7 @@ export default function FaxPacketAssembler({
                   </h3>
                 </div>
                 <pre className="text-xs text-text-secondary font-mono leading-relaxed whitespace-pre-wrap break-words max-h-32 overflow-y-auto">
-                  {letter || 'No letter available. Run an audit to generate the justification letter.'}
+                  {effectiveLetter || 'No letter available. Run an audit to generate the justification letter.'}
                 </pre>
               </div>
 
@@ -204,9 +238,9 @@ export default function FaxPacketAssembler({
                     Payer Evidence Binder — Satisfied Criteria
                   </h3>
                 </div>
-                {satisfiedCriteria.length > 0 ? (
+                {effectiveCriteria.length > 0 ? (
                   <ul className="space-y-1.5">
-                    {satisfiedCriteria.map((c, i) => (
+                    {effectiveCriteria.map((c, i) => (
                       <li key={c.id} className="flex items-start gap-2 text-xs text-text-secondary">
                         <span className="mt-0.5 flex-shrink-0 w-4 h-4 rounded-full bg-status-green/10 flex items-center justify-center">
                           <Check size={10} className="text-status-green" />
@@ -236,7 +270,7 @@ export default function FaxPacketAssembler({
                 <div className="space-y-1.5 text-xs text-text-secondary">
                   <div className="flex justify-between">
                     <span className="text-text-primary/60">Payer:</span>
-                    <span className="text-text-primary font-medium">{payerName || 'N/A'}</span>
+                    <span className="text-text-primary font-medium">{effectivePayer}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-text-primary/60">LCD Number:</span>
@@ -244,11 +278,11 @@ export default function FaxPacketAssembler({
                   </div>
                   <div className="flex justify-between">
                     <span className="text-text-primary/60">CPT Code:</span>
-                    <span className="text-text-primary font-medium">{cptCode || 'N/A'}</span>
+                    <span className="text-text-primary font-medium">{effectiveCpt}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-text-primary/60">Total Criteria Referenced:</span>
-                    <span className="text-text-primary font-medium">{satisfiedCriteria.length}</span>
+                    <span className="text-text-primary font-medium">{effectiveCriteria.length}</span>
                   </div>
                 </div>
               </div>

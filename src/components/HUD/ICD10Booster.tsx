@@ -2,6 +2,8 @@
 
 import React, { useState, useCallback } from 'react';
 import { X, Sparkles, ArrowRight, CheckCircle2, Clipboard, AlertCircle, Stethoscope } from 'lucide-react';
+import { useCaseState } from '@/lib/useCaseState';
+import NoActiveCaseMessage from './NoActiveCaseMessage';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -179,11 +181,17 @@ interface ICD10BoosterProps {
 // ---------------------------------------------------------------------------
 
 export default function ICD10Booster({ isOpen, onClose, cptCode, payerName }: ICD10BoosterProps) {
+  const { activeCase } = useCaseState();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [appliedCodes, setAppliedCodes] = useState<Set<string>>(new Set());
   const [appliedMods, setAppliedMods] = useState<Set<string>>(new Set());
   const [showToast, setShowToast] = useState(false);
+
+  // Use active case data, falling back to props
+  const effectiveCptCode = activeCase?.cptCode || cptCode || null;
+  const effectivePayer = activeCase?.payerName || payerName || null;
+  const chartNote = activeCase?.chartNote ?? null;
 
   const handleAnalyze = useCallback(() => {
     setIsAnalyzing(true);
@@ -191,22 +199,30 @@ export default function ICD10Booster({ isOpen, onClose, cptCode, payerName }: IC
     setAppliedCodes(new Set());
     setAppliedMods(new Set());
 
+    // Scan chartNote for additional context if available
+    const hasRadiculopathy = chartNote ? /radiculopathy|sciatica|nerve root|radicular/i.test(chartNote) : false;
+
     setTimeout(() => {
-      const data = CODE_SUGGESTIONS[cptCode || ''] || {
+      const data = CODE_SUGGESTIONS[effectiveCptCode || ''] || {
         suggestions: DEFAULT_SUGGESTIONS,
         modifiers: DEFAULT_MODIFIERS,
-        procedureContext: 'General Procedure',
+        procedureContext: effectiveCptCode ? `CPT ${effectiveCptCode}` : 'General Procedure',
       };
+
+      // If chart note shows radiculopathy, add that context
+      const context = hasRadiculopathy
+        ? `${data.procedureContext} — Radiculopathy detected in chart note`
+        : data.procedureContext;
 
       setResult({
         suggestions: data.suggestions,
         modifiers: data.modifiers,
-        procedureContext: data.procedureContext,
+        procedureContext: context,
         scannedAt: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
       });
       setIsAnalyzing(false);
     }, 1200);
-  }, [cptCode]);
+  }, [effectiveCptCode, chartNote]);
 
   const handleApplyCode = useCallback(
     (code: string) => {
@@ -243,6 +259,28 @@ export default function ICD10Booster({ isOpen, onClose, cptCode, payerName }: IC
   }, [result]);
 
   if (!isOpen) return null;
+
+  // No active case and no props
+  if (!activeCase && !cptCode) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border-light bg-gradient-to-r from-accent-blue/5 to-status-green/5">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-accent-blue/10">
+                <Stethoscope size={20} className="text-accent-blue" />
+              </div>
+              <h2 className="text-lg font-semibold text-heading-navy">ICD-10 Specificity Booster</h2>
+            </div>
+            <button onClick={onClose} className="p-2 rounded-lg hover:bg-black/5 transition-colors">
+              <X size={18} className="text-text-secondary" />
+            </button>
+          </div>
+          <NoActiveCaseMessage />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
