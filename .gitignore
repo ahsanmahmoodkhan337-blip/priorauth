@@ -15,6 +15,9 @@ node_modules
 # Runtime server log
 /.run/
 
+# JSON data store
+/data/
+
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts

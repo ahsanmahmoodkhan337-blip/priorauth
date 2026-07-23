@@ -19,11 +19,25 @@ import {
   X,
   ChevronDown,
 } from 'lucide-react';
-import {
-  AccessRequest,
-  getAccessRequests,
-  updateAccessRequest,
-} from '@/lib/accessRequests';
+
+// ---------------------------------------------------------------------------
+// Types (mirror server-side AccessRequest)
+// ---------------------------------------------------------------------------
+
+interface AccessRequest {
+  id: string;
+  fullName: string;
+  phone: string;
+  email: string;
+  paymentMethod: 'bank-islami' | 'easypaisa' | 'paypal';
+  transactionId: string;
+  receiptSent: boolean;
+  status: 'pending' | 'approved' | 'rejected';
+  submittedAt: string;
+  approvedAt?: string;
+  expiresAt?: string;
+  accessDurationDays?: number;
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -60,14 +74,28 @@ export default function AdminPage() {
       const stored = localStorage.getItem('admin_authenticated');
       if (stored === 'true') {
         setAuthenticated(true);
-        loadRequests();
       }
     }
   }, []);
 
-  const loadRequests = useCallback(() => {
-    setRequests(getAccessRequests());
+  const loadRequests = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/requests');
+      if (res.ok) {
+        const data = await res.json();
+        setRequests(data);
+      }
+    } catch {
+      // Silently fail — keep old data if available
+    }
   }, []);
+
+  // -- Load requests when authenticated
+  useEffect(() => {
+    if (authenticated) {
+      loadRequests();
+    }
+  }, [authenticated, loadRequests]);
 
   // -- Auto-refresh every 5 seconds
   useEffect(() => {
@@ -84,14 +112,13 @@ export default function AdminPage() {
         localStorage.setItem('admin_authenticated', 'true');
         setAuthenticated(true);
         setAuthError(false);
-        loadRequests();
       } else {
         setAuthError(true);
         setShake(true);
         setTimeout(() => setShake(false), 500);
       }
     },
-    [accessKey, loadRequests]
+    [accessKey]
   );
 
   // -- Handle logout
@@ -106,7 +133,7 @@ export default function AdminPage() {
 
   // -- Handle approve
   const handleApprove = useCallback(
-    (req: AccessRequest) => {
+    async (req: AccessRequest) => {
       const days =
         durationDays === -1
           ? parseInt(customDays, 10) || 7
@@ -116,41 +143,60 @@ export default function AdminPage() {
         return;
       }
 
-      const now = new Date();
-      const expiresAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+      try {
+        const res = await fetch('/api/admin/requests', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: req.id,
+            status: 'approved',
+            accessDurationDays: days,
+          }),
+        });
 
-      updateAccessRequest(req.id, {
-        status: 'approved',
-        approvedAt: now.toISOString(),
-        expiresAt: expiresAt.toISOString(),
-        accessDurationDays: days,
-      });
+        if (res.ok) {
+          const data = await res.json();
 
-      loadRequests();
-      setApprovingId(null);
-      setDurationDays(7);
-      setCustomDays('');
+          loadRequests();
+          setApprovingId(null);
+          setDurationDays(7);
+          setCustomDays('');
 
-      const expiryDate = expiresAt.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      });
+          const expiryDate = new Date(data.request.expiresAt).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          });
 
-      setSuccessMessage(
-        `Access approved for ${req.fullName} (${req.phone}). Expires: ${expiryDate}`
-      );
-      setTimeout(() => setSuccessMessage(null), 6000);
+          setSuccessMessage(
+            `Access approved for ${req.fullName} (${req.phone}). Expires: ${expiryDate}`
+          );
+          setTimeout(() => setSuccessMessage(null), 6000);
+        }
+      } catch {
+        // Error handled silently
+      }
     },
     [durationDays, customDays, loadRequests]
   );
 
   // -- Handle reject
   const handleReject = useCallback(
-    (id: string) => {
-      updateAccessRequest(id, { status: 'rejected' });
-      loadRequests();
-      setRejectingId(null);
+    async (id: string) => {
+      try {
+        const res = await fetch('/api/admin/requests', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, status: 'rejected' }),
+        });
+
+        if (res.ok) {
+          loadRequests();
+          setRejectingId(null);
+        }
+      } catch {
+        // Error handled silently
+      }
     },
     [loadRequests]
   );

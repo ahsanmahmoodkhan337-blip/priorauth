@@ -18,10 +18,11 @@ import {
   ArrowRight,
   ShieldCheck,
   HelpCircle,
+  AlertCircle,
 } from 'lucide-react';
 import LandingNavbar from '@/components/LandingNavbar';
 import Footer from '@/components/Footer';
-import { saveAccessRequest } from '@/lib/accessRequests';
+// Note: saveAccessRequest import removed — now posting to /api/enroll
 
 // ---------------------------------------------------------------------------
 // Types
@@ -118,6 +119,8 @@ export default function LandingPage() {
 
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   // -- Handlers
@@ -164,7 +167,7 @@ export default function LandingPage() {
   }, [formData]);
 
   const handleSubmit = useCallback(
-    (e: React.FormEvent) => {
+    async (e: React.FormEvent) => {
       e.preventDefault();
       setTouched({
         fullName: true,
@@ -176,37 +179,53 @@ export default function LandingPage() {
 
       if (!validate()) return;
 
-      // Save to localStorage for admin panel
-      saveAccessRequest({
-        id: crypto.randomUUID(),
-        fullName: formData.fullName.trim(),
-        phone: formData.phone.trim(),
-        email: formData.email.trim() || '',
-        paymentMethod: formData.paymentMethod as 'bank-islami' | 'easypaisa' | 'paypal',
-        transactionId: formData.transactionId.trim(),
-        receiptSent: formData.receiptSent === true,
-        status: 'pending',
-        submittedAt: new Date().toISOString(),
-      });
+      setSubmitting(true);
+      setSubmitError(null);
 
-      setSubmitted(true);
-
-      // Reset form after 5 seconds
-      setTimeout(() => {
-        setSubmitted(false);
-        setFormData({
-          fullName: '',
-          phone: '',
-          email: '',
-          paymentMethod: '',
-          transactionId: '',
-          receiptSent: null,
+      try {
+        const res = await fetch('/api/enroll', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fullName: formData.fullName.trim(),
+            phone: formData.phone.trim(),
+            email: formData.email.trim() || '',
+            paymentMethod: formData.paymentMethod || 'easypaisa',
+            transactionId: formData.transactionId.trim(),
+            receiptSent: formData.receiptSent === true,
+          }),
         });
-        setTouched({});
-        setErrors({});
-      }, 5000);
+
+        const data = await res.json();
+
+        if (data.success) {
+          setSubmitted(true);
+          setSubmitError(null);
+
+          // Reset form after 5 seconds
+          setTimeout(() => {
+            setSubmitted(false);
+            setFormData({
+              fullName: '',
+              phone: '',
+              email: '',
+              paymentMethod: '',
+              transactionId: '',
+              receiptSent: null,
+            });
+            setTouched({});
+            setErrors({});
+          }, 5000);
+        } else {
+          setSubmitError(data.message || 'Submission failed. Please try again.');
+        }
+      } catch {
+        setSubmitError('Network error. Please check your connection and try again.');
+      } finally {
+        setSubmitting(false);
+      }
     },
-    [formData, selectedPayment, validate]
+    [formData, validate]
   );
 
   // -- Helpers
@@ -546,6 +565,21 @@ export default function LandingPage() {
             </motion.div>
           )}
 
+          {/* Error message */}
+          {submitError && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-8 p-4 rounded-xl bg-status-red/10 border border-status-red/30
+                         flex items-center gap-3"
+            >
+              <AlertCircle size={20} className="text-status-red flex-shrink-0" />
+              <p className="text-sm font-medium text-text-primary">
+                {submitError}
+              </p>
+            </motion.div>
+          )}
+
           {/* Form card */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -731,13 +765,27 @@ export default function LandingPage() {
               {/* Submit Button */}
               <button
                 type="submit"
+                disabled={submitting}
                 className="w-full py-3 rounded-xl bg-accent-blue text-white font-semibold text-sm
                            hover:bg-accent-blue/90 transition-all duration-200
                            shadow-lg shadow-accent-blue/20 hover:shadow-xl hover:shadow-accent-blue/30
-                           active:scale-[0.98] flex items-center justify-center gap-2"
+                           active:scale-[0.98] flex items-center justify-center gap-2
+                           disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <Send size={16} />
-                Submit Access Request
+                {submitting ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Submitting...
+                  </>
+                ) : (
+                  <>
+                    <Send size={16} />
+                    Submit Access Request
+                  </>
+                )}
               </button>
             </form>
           </motion.div>
