@@ -1,7 +1,10 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { FileText, BarChart3, BookOpen, Loader2, AlertCircle } from 'lucide-react';
+import {
+  FileText, BarChart3, BookOpen, Loader2, AlertCircle,
+  ChevronDown, ChevronUp, Zap,
+} from 'lucide-react';
 import SampleCaseSelector from '@/components/HUD/SampleCaseSelector';
 import type { SampleCaseData } from '@/components/HUD/SampleCaseSelector';
 import ChartEditor from '@/components/HUD/ChartEditor';
@@ -10,6 +13,10 @@ import ScoreGauge from '@/components/HUD/ScoreGauge';
 import CriteriaChecklist from '@/components/HUD/CriteriaChecklist';
 import PolicyCitationDrawer from '@/components/HUD/PolicyCitationDrawer';
 import PacketGeneratorModal from '@/components/HUD/PacketGeneratorModal';
+import FaxPacketAssembler from '@/components/HUD/FaxPacketAssembler';
+import StatuteClock from '@/components/HUD/StatuteClock';
+import PatientNotifier from '@/components/HUD/PatientNotifier';
+import SessionKeepAlive from '@/components/HUD/SessionKeepAlive';
 
 // ---------------------------------------------------------------------------
 // Types — mirrored from the evaluation engine & API
@@ -96,6 +103,9 @@ export default function SplitScreenContainer() {
 
   const [isPolicyOpen, setIsPolicyOpen] = useState(false);
   const [isPacketOpen, setIsPacketOpen] = useState(false);
+  const [isFaxOpen, setIsFaxOpen] = useState(false);
+  const [isPatientNotifierOpen, setIsPatientNotifierOpen] = useState(false);
+  const [isWorkloadToolsExpanded, setIsWorkloadToolsExpanded] = useState(false);
 
   // ---- Handlers -----------------------------------------------------------
 
@@ -371,6 +381,104 @@ export default function SplitScreenContainer() {
                   </div>
                 </>
               )}
+
+              {/* ---- Quick-Action Workload Tools (always visible) ---- */}
+              <div className="border-t border-border-light mt-2 pt-2">
+                <button
+                  onClick={() => setIsWorkloadToolsExpanded((prev) => !prev)}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg
+                             hover:bg-accent-gold/5 transition-colors duration-200 group"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="p-1 rounded bg-accent-gold/10">
+                      <Zap size={12} className="text-accent-gold" />
+                    </div>
+                    <span className="text-xs font-semibold text-text-primary">
+                      ⚡ Quick-Action Workload Tools
+                    </span>
+                  </div>
+                  {isWorkloadToolsExpanded ? (
+                    <ChevronUp size={14} className="text-text-secondary group-hover:text-text-primary transition-colors" />
+                  ) : (
+                    <ChevronDown size={14} className="text-text-secondary group-hover:text-text-primary transition-colors" />
+                  )}
+                </button>
+
+                {/* Expandable Content */}
+                <div
+                  className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                    isWorkloadToolsExpanded ? 'max-h-[800px] opacity-100 mt-2' : 'max-h-0 opacity-0'
+                  }`}
+                >
+                  <div className="px-3 pb-3 space-y-3">
+                    {/* Tool 1: Fax Packet Assembler */}
+                    <div className="rounded-lg border border-accent-gold/20 bg-accent-gold/3 p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-1.5">
+                          <FileText size={12} className="text-accent-gold" />
+                          <span className="text-[11px] font-semibold text-text-primary">
+                            📄 AI e-Fax &amp; PDF Packet
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-text-secondary mb-2">
+                        HIPAA cover sheet + justification letter + evidence binder + citations
+                      </p>
+                      <button
+                        onClick={() => setIsFaxOpen(true)}
+                        disabled={!letter}
+                        className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md
+                                   bg-accent-gold/10 border border-accent-gold/25 text-accent-gold text-[10px] font-medium
+                                   hover:bg-accent-gold/20 transition-all duration-200
+                                   disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <FileText size={12} />
+                        Compile HIPAA e-Fax Packet
+                      </button>
+                    </div>
+
+                    {/* Tool 2: ERISA & State Prompt-Pay Statute Clock */}
+                    <div className="rounded-lg border border-accent-blue/20 bg-accent-blue/3 p-3">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <span className="text-[11px] font-semibold text-text-primary">
+                          ⏱️ ERISA &amp; State Prompt-Pay Clock
+                        </span>
+                      </div>
+                      <StatuteClock compact />
+                    </div>
+
+                    {/* Tool 3: Patient SMS/Email Generator */}
+                    <div className="rounded-lg border border-accent-blue/20 bg-accent-blue/3 p-3">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <span className="text-[11px] font-semibold text-text-primary">
+                          📱 Patient Status Message Generator
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-text-secondary mb-2">
+                        Convert PA jargon into plain-English SMS/email updates
+                      </p>
+                      <button
+                        onClick={() => setIsPatientNotifierOpen(true)}
+                        className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md
+                                   bg-accent-blue/10 border border-accent-blue/25 text-accent-blue text-[10px] font-medium
+                                   hover:bg-accent-blue/20 transition-all duration-200"
+                      >
+                        📱 Draft Patient Status SMS/Email
+                      </button>
+                    </div>
+
+                    {/* Tool 4: Portal Keep-Alive */}
+                    <div className="rounded-lg border border-status-green/20 bg-status-green/3 p-3">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <span className="text-[11px] font-semibold text-text-primary">
+                          🔄 Portal Anti-Timeout Keep-Alive
+                        </span>
+                      </div>
+                      <SessionKeepAlive compact />
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -389,6 +497,24 @@ export default function SplitScreenContainer() {
         isOpen={isPacketOpen}
         onClose={() => setIsPacketOpen(false)}
         letter={letter}
+      />
+
+      <FaxPacketAssembler
+        isOpen={isFaxOpen}
+        onClose={() => setIsFaxOpen(false)}
+        letter={letter}
+        payerName={payerName ?? ''}
+        cptCode={cptCode ?? ''}
+        procedureName={evalResult?.procedureName ?? ''}
+        satisfiedCriteria={satisfiedCriteria}
+        lcdNumber="L36789"
+      />
+
+      <PatientNotifier
+        isOpen={isPatientNotifierOpen}
+        onClose={() => setIsPatientNotifierOpen(false)}
+        payerName={payerName ?? ''}
+        procedureName={evalResult?.procedureName ?? ''}
       />
     </>
   );
