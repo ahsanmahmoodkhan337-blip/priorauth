@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { LogOut, Clock } from 'lucide-react';
+import Link from 'next/link';
+import { LogOut, Clock, ArrowLeft } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import GuidelineSyncBar from '@/components/GuidelineSyncBar';
 import SplitScreenContainer from '@/components/HUD/SplitScreenContainer';
@@ -89,6 +90,13 @@ export default function WorkspacePage() {
       {/* Auth header bar */}
       <div className="bg-heading-navy text-white px-4 py-2 flex items-center justify-between text-sm z-50 relative">
         <div className="flex items-center gap-4">
+          <Link
+            href="/"
+            className="text-xs font-medium text-white/60 hover:text-white transition-colors flex items-center gap-1"
+          >
+            <ArrowLeft size={12} />
+            Home
+          </Link>
           <span className="font-medium">
             Welcome, <span className="text-accent-gold">{auth.fullName}</span>
           </span>

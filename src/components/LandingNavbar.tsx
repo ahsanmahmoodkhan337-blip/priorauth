@@ -3,7 +3,7 @@
 import React, { useState, useCallback } from 'react';
 import Link from 'next/link';
 import ModeToggle from '@/components/HUD/ModeToggle';
-import { Shield } from 'lucide-react';
+import { Shield, LogIn } from 'lucide-react';
 
 export default function LandingNavbar() {
   const [mode, setMode] = useState<'student' | 'b2b'>('student');
@@ -40,9 +40,16 @@ export default function LandingNavbar() {
             </div>
           </div>
 
-          {/* Right: Mode Toggle + Admin Panel link */}
+          {/* Right: Mode Toggle + Student Login + Admin Panel link */}
           <div className="flex items-center gap-4 sm:gap-6">
             <ModeToggle mode={mode} onToggle={handleToggleMode} />
+            <Link
+              href="/login"
+              className="text-xs font-medium text-text-secondary hover:text-accent-blue transition-colors flex items-center gap-1"
+            >
+              <LogIn size={12} />
+              <span>Student Login</span>
+            </Link>
             <Link
               href="/admin"
               className="text-xs font-medium text-text-secondary hover:text-accent-blue transition-colors flex items-center gap-1"

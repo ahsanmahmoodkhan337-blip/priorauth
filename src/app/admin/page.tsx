@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Link from 'next/link';
 import {
   ShieldCheck,
   Shield,
@@ -355,13 +356,13 @@ export default function AdminPage() {
 
             {/* Right */}
             <div className="flex items-center gap-4">
-              <a
+              <Link
                 href="/"
                 className="text-xs font-medium text-text-secondary hover:text-accent-blue transition-colors flex items-center gap-1"
               >
                 <ArrowLeft size={14} />
-                Back to Site
-              </a>
+                Home
+              </Link>
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-lg

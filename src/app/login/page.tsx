@@ -3,12 +3,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { LogIn, AlertCircle, ArrowLeft } from 'lucide-react';
+import { LogIn, AlertCircle, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 
 export default function LoginPage() {
   const router = useRouter();
   const [phone, setPhone] = useState('');
+  const [showPhone, setShowPhone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -69,7 +70,7 @@ export default function LoginPage() {
         className="absolute top-6 left-6 text-xs font-medium text-text-secondary hover:text-accent-blue transition-colors flex items-center gap-1"
       >
         <ArrowLeft size={14} />
-        Back to Home
+        Home
       </Link>
 
       <motion.div
@@ -107,9 +108,10 @@ export default function LoginPage() {
               >
                 Phone Number
               </label>
+              <div className="relative">
               <input
                 id="phone"
-                type="tel"
+                type={showPhone ? 'text' : 'password'}
                 value={phone}
                 onChange={(e) => {
                   setPhone(e.target.value);
@@ -118,12 +120,21 @@ export default function LoginPage() {
                 placeholder="03001234567"
                 autoComplete="tel"
                 autoFocus
-                className={`w-full px-4 py-3 rounded-xl border text-sm text-text-primary
+                className={`w-full px-4 py-3 pr-11 rounded-xl border text-sm text-text-primary
                             bg-white placeholder:text-text-secondary/40
                             focus:outline-none focus:ring-2 focus:ring-accent-blue/30 focus:border-accent-blue
                             transition-all duration-200
                             ${error ? 'border-status-red ring-1 ring-status-red/20' : 'border-border-light'}`}
               />
+              <button
+                type="button"
+                onClick={() => setShowPhone(!showPhone)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary hover:text-text-primary transition-colors"
+                aria-label={showPhone ? 'Hide phone number' : 'Show phone number'}
+              >
+                {showPhone ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
             </div>
 
             {/* Error Message */}

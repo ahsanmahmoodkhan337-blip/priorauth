@@ -20,6 +20,7 @@ import {
   HelpCircle,
   AlertCircle,
 } from 'lucide-react';
+import Link from 'next/link';
 import LandingNavbar from '@/components/LandingNavbar';
 import Footer from '@/components/Footer';
 // Note: saveAccessRequest import removed — now posting to /api/enroll
@@ -201,21 +202,6 @@ export default function LandingPage() {
         if (data.success) {
           setSubmitted(true);
           setSubmitError(null);
-
-          // Reset form after 5 seconds
-          setTimeout(() => {
-            setSubmitted(false);
-            setFormData({
-              fullName: '',
-              phone: '',
-              email: '',
-              paymentMethod: '',
-              transactionId: '',
-              receiptSent: null,
-            });
-            setTouched({});
-            setErrors({});
-          }, 5000);
         } else {
           setSubmitError(data.message || 'Submission failed. Please try again.');
         }
@@ -292,6 +278,7 @@ export default function LandingPage() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6, duration: 0.5 }}
+            className="flex flex-col items-center gap-4"
           >
             <a
               href="#enroll"
@@ -304,6 +291,13 @@ export default function LandingPage() {
               Enroll Now
               <ArrowRight size={18} />
             </a>
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-1 text-sm font-medium text-accent-blue hover:text-accent-blue/80 transition-colors"
+            >
+              Already enrolled? Login
+              <ArrowRight size={14} />
+            </Link>
           </motion.div>
         </div>
       </section>
@@ -550,23 +544,54 @@ export default function LandingPage() {
             </p>
           </motion.div>
 
-          {/* Success message */}
+          {/* Success / Thank-You Card */}
           {submitted && (
             <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mb-8 p-4 rounded-xl bg-status-green/10 border border-status-green/30
-                         flex items-center gap-3"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4 }}
+              className="bg-white rounded-xl border border-border-light p-8 sm:p-10 shadow-sm text-center"
             >
-              <CheckCircle2 size={20} className="text-status-green flex-shrink-0" />
-              <p className="text-sm font-medium text-text-primary">
-                Your access request has been submitted! You&apos;ll be notified once approved.
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
+                className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-status-green/10 mb-5"
+              >
+                <CheckCircle2 size={40} className="text-status-green" />
+              </motion.div>
+              <h3 className="text-xl sm:text-2xl font-bold text-heading-navy mb-3">
+                Thank You! Your request has been submitted.
+              </h3>
+              <p className="text-sm text-text-secondary max-w-md mx-auto mb-6">
+                We&apos;ll review your payment and grant access within 24 hours.
+                You&apos;ll be able to log in using your phone number once approved.
               </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setSubmitted(false);
+                  setFormData({
+                    fullName: '',
+                    phone: '',
+                    email: '',
+                    paymentMethod: '',
+                    transactionId: '',
+                    receiptSent: null,
+                  });
+                  setTouched({});
+                  setErrors({});
+                  setSubmitError(null);
+                }}
+                className="text-sm font-medium text-accent-blue hover:text-accent-blue/80 transition-colors"
+              >
+                Submit Another Request
+              </button>
             </motion.div>
           )}
 
           {/* Error message */}
-          {submitError && (
+          {!submitted && submitError && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -580,7 +605,8 @@ export default function LandingPage() {
             </motion.div>
           )}
 
-          {/* Form card */}
+          {/* Form card — hidden after submission */}
+          {!submitted && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -789,6 +815,8 @@ export default function LandingPage() {
               </button>
             </form>
           </motion.div>
+          )}
+
         </div>
       </section>
 
