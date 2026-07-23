@@ -52,17 +52,17 @@ export default function GuidelineSyncBar() {
   return (
     <>
       {/* Sync Bar */}
-      <div className="fixed top-16 left-0 right-0 z-40 bg-bg-primary/95 border-b border-accent-cyan/10 backdrop-blur-sm">
+      <div className="fixed top-16 left-0 right-0 z-40 bg-white/95 border-b border-border-light backdrop-blur-sm">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-10">
             {/* Status indicator */}
             <div className="flex items-center gap-2.5">
               <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-cyan opacity-50" />
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-accent-cyan pulse-dot" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-blue opacity-50" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-accent-blue" />
               </span>
               <span className="text-xs text-text-secondary font-medium">
-                Live Guidelines: <span className="text-accent-cyan">Up to Date (2026 Standards)</span>
+                Live Guidelines: <span className="text-accent-blue">Up to Date (2026 Standards)</span>
               </span>
             </div>
 
@@ -70,8 +70,8 @@ export default function GuidelineSyncBar() {
             <button
               onClick={handleSync}
               disabled={isRunning}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-md border border-accent-cyan/40 
-                         text-accent-cyan text-xs font-medium hover:bg-accent-cyan/10 
+              className="flex items-center gap-1.5 px-3 py-1 rounded-md border border-accent-blue/40 
+                         text-accent-blue text-xs font-medium hover:bg-accent-blue/10 
                          transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <RefreshCw
@@ -104,7 +104,7 @@ export default function GuidelineSyncBar() {
             >
               {/* Header */}
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-sm font-semibold text-accent-cyan uppercase tracking-wider">
+                <h3 className="text-sm font-semibold text-accent-blue uppercase tracking-wider">
                   Guideline Sync
                 </h3>
                 <button
@@ -129,14 +129,14 @@ export default function GuidelineSyncBar() {
                     transition={{ duration: 0.3 }}
                     className={`flex items-center gap-3 p-3 rounded-lg border transition-colors duration-300 ${
                       currentStep >= index + 1
-                        ? 'border-accent-cyan/30 bg-accent-cyan/5'
-                        : 'border-transparent bg-bg-primary/30'
+                        ? 'border-accent-blue/30 bg-accent-blue/5'
+                        : 'border-transparent bg-bg-secondary'
                     }`}
                   >
                     <span
                       className={`transition-colors duration-300 ${
                         currentStep >= index + 1
-                          ? 'text-accent-cyan'
+                          ? 'text-accent-blue'
                           : 'text-text-secondary/40'
                       }`}
                     >
@@ -173,7 +173,7 @@ export default function GuidelineSyncBar() {
                       <motion.span
                         animate={{ opacity: [0.4, 1, 0.4] }}
                         transition={{ duration: 0.6, repeat: Infinity }}
-                        className="ml-auto text-accent-cyan text-[10px]"
+                        className="ml-auto text-accent-blue text-[10px]"
                       >
                         ▸
                       </motion.span>
@@ -183,7 +183,7 @@ export default function GuidelineSyncBar() {
               </div>
 
               {/* Footer */}
-              <div className="mt-6 pt-4 border-t border-accent-cyan/10 flex justify-between items-center">
+              <div className="mt-6 pt-4 border-t border-border-light flex justify-between items-center">
                 <span className="text-[10px] text-text-secondary/60 font-mono">
                   {isRunning ? 'syncing...' : 'ready_'}
                 </span>
@@ -192,8 +192,8 @@ export default function GuidelineSyncBar() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     onClick={handleClose}
-                    className="px-4 py-1.5 rounded-md bg-accent-cyan/10 border border-accent-cyan/30 
-                               text-accent-cyan text-xs font-medium hover:bg-accent-cyan/20 transition-colors"
+                    className="px-4 py-1.5 rounded-md bg-accent-blue/10 border border-accent-blue/30 
+                               text-accent-blue text-xs font-medium hover:bg-accent-blue/20 transition-colors"
                   >
                     Close
                   </motion.button>

@@ -78,11 +78,10 @@ export default function PacketGeneratorModal({
             exit={{ scale: 0.92, opacity: 0, y: 30 }}
             transition={{ type: 'spring', stiffness: 350, damping: 28 }}
             onClick={(e) => e.stopPropagation()}
-            className="glass-card w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl
-                       border-accent-cyan/20"
+            className="glass-card w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl"
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-accent-cyan/10">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border-light">
               <div className="flex items-center gap-2.5">
                 <div className="p-1.5 rounded-md bg-accent-gold/10">
                   <FileText size={16} className="text-accent-gold" />
@@ -99,7 +98,7 @@ export default function PacketGeneratorModal({
               <button
                 onClick={onClose}
                 className="p-1.5 rounded-md text-text-secondary hover:text-text-primary
-                           hover:bg-white/5 transition-colors"
+                           hover:bg-gray-100 transition-colors"
               >
                 <X size={18} />
               </button>
@@ -107,7 +106,7 @@ export default function PacketGeneratorModal({
 
             {/* Letter Content */}
             <div className="flex-1 overflow-y-auto p-5">
-              <div className="rounded-lg bg-bg-primary border border-accent-cyan/10 p-5">
+              <div className="rounded-lg bg-bg-secondary border border-border-light p-5">
                 <pre className="text-sm text-text-primary font-mono leading-relaxed whitespace-pre-wrap break-words">
                   {letter || 'No letter content generated yet. Run an evaluation to generate the justification letter.'}
                 </pre>
@@ -115,14 +114,14 @@ export default function PacketGeneratorModal({
             </div>
 
             {/* Footer Actions */}
-            <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-accent-cyan/10">
+            <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-border-light">
               <button
                 onClick={handleCopy}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium
                            transition-all duration-200
                            ${copied
                              ? 'bg-status-green/10 border border-status-green/30 text-status-green'
-                             : 'bg-accent-cyan/10 border border-accent-cyan/30 text-accent-cyan hover:bg-accent-cyan/20'
+                             : 'bg-accent-blue/10 border border-accent-blue/30 text-accent-blue hover:bg-accent-blue/20'
                            }`}
               >
                 {copied ? (

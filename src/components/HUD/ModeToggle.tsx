@@ -15,12 +15,12 @@ export default function ModeToggle({ mode, onToggle }: ModeToggleProps) {
       {/* Toggle Pill */}
       <button
         onClick={onToggle}
-        className="relative flex items-center rounded-lg border border-accent-cyan/30
-                   bg-bg-primary/50 overflow-hidden"
+        className="relative flex items-center rounded-lg border border-accent-blue/30
+                   bg-white overflow-hidden"
       >
         {/* Sliding background */}
         <motion.div
-          className="absolute top-0.5 bottom-0.5 rounded-md bg-accent-cyan/15"
+          className="absolute top-0.5 bottom-0.5 rounded-md bg-accent-blue/15"
           initial={false}
           animate={{
             left: mode === 'student' ? '0.25rem' : '50%',
@@ -34,7 +34,7 @@ export default function ModeToggle({ mode, onToggle }: ModeToggleProps) {
           className={`relative z-10 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium
                       transition-colors duration-200 ${
                         mode === 'student'
-                          ? 'text-accent-cyan'
+                          ? 'text-accent-blue'
                           : 'text-text-secondary hover:text-text-primary'
                       }`}
         >
@@ -47,7 +47,7 @@ export default function ModeToggle({ mode, onToggle }: ModeToggleProps) {
           className={`relative z-10 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium
                       transition-colors duration-200 ${
                         mode === 'b2b'
-                          ? 'text-accent-cyan'
+                          ? 'text-accent-blue'
                           : 'text-text-secondary hover:text-text-primary'
                       }`}
         >
@@ -80,7 +80,7 @@ export default function ModeToggle({ mode, onToggle }: ModeToggleProps) {
           <button
             disabled
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg
-                       bg-bg-primary/50 border border-text-secondary/15
+                       bg-bg-secondary border border-text-secondary/15
                        text-text-secondary/40 text-[10px] font-medium
                        cursor-not-allowed"
             title="Bulk Audit — Coming Soon"
@@ -91,7 +91,7 @@ export default function ModeToggle({ mode, onToggle }: ModeToggleProps) {
           <button
             disabled
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg
-                       bg-bg-primary/50 border border-text-secondary/15
+                       bg-bg-secondary border border-text-secondary/15
                        text-text-secondary/40 text-[10px] font-medium
                        cursor-not-allowed"
             title="CSV Export — Coming Soon"

@@ -41,7 +41,7 @@ function SectionHeader({
     <button
       onClick={onToggle}
       className="w-full flex items-center justify-between px-4 py-3
-                 hover:bg-white/[0.02] transition-colors duration-150"
+                 hover:bg-gray-50 transition-colors duration-150"
     >
       <div className="flex items-center gap-2.5">
         {icon}
@@ -70,7 +70,7 @@ export default function CriteriaChecklist({
   return (
     <div className="glass-card overflow-hidden">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-accent-cyan/10">
+      <div className="px-4 py-3 border-b border-border-light">
         <h3 className="text-sm font-semibold text-text-primary">Criteria Checklist</h3>
         <p className="text-[10px] text-text-secondary mt-0.5">
           Payer policy requirements vs. clinical documentation
@@ -78,7 +78,7 @@ export default function CriteriaChecklist({
       </div>
 
       {/* Satisfied Criteria Section */}
-      <div className="border-b border-accent-cyan/5">
+      <div className="border-b border-border-light">
         <SectionHeader
           title="Satisfied Criteria"
           isOpen={satisfiedOpen}

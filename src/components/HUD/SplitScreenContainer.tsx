@@ -302,9 +302,9 @@ export default function SplitScreenContainer() {
         <div className="flex-1 lg:w-1/2 flex flex-col gap-4 min-h-0">
           {/* Panel Header */}
           <div className="glass-card p-1 flex-shrink-0">
-            <div className="flex items-center gap-2.5 px-4 py-3 border-b border-accent-cyan/10">
-              <div className="p-1.5 rounded-md bg-accent-cyan/10">
-                <FileText size={16} className="text-accent-cyan" />
+            <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border-light">
+              <div className="p-1.5 rounded-md bg-accent-blue/10">
+                <FileText size={16} className="text-accent-blue" />
               </div>
               <div>
                 <h2 className="text-sm font-semibold text-text-primary">
@@ -340,7 +340,7 @@ export default function SplitScreenContainer() {
         {/* ================================================================ */}
         <div className="flex-1 lg:w-1/2 flex flex-col gap-4 min-h-0">
           <div className="glass-card p-1 flex-shrink-0">
-            <div className="flex items-center gap-2.5 px-4 py-3 border-b border-accent-cyan/10">
+            <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border-light">
               <div className="p-1.5 rounded-md bg-accent-gold/10">
                 <BarChart3 size={16} className="text-accent-gold" />
               </div>
@@ -383,8 +383,8 @@ export default function SplitScreenContainer() {
                   onClick={() => setIsPolicyOpen(true)}
                   disabled={!policy}
                   className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg
-                             border border-accent-cyan/30 text-accent-cyan text-xs font-medium
-                             hover:bg-accent-cyan/10 transition-all duration-200
+                             border border-accent-blue/30 text-accent-blue text-xs font-medium
+                             hover:bg-accent-blue/10 transition-all duration-200
                              disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   <BookOpen size={14} />
@@ -396,12 +396,11 @@ export default function SplitScreenContainer() {
                   onClick={() => setIsPacketOpen(true)}
                   disabled={!letter}
                   className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg
-                             bg-gradient-to-r from-accent-cyan/20 to-accent-cyan/5
-                             border border-accent-cyan/40 text-accent-cyan text-xs font-medium
-                             hover:from-accent-cyan/30 hover:to-accent-cyan/10
+                             bg-gradient-to-r from-accent-blue/20 to-accent-blue/5
+                             border border-accent-blue/40 text-accent-blue text-xs font-medium
+                             hover:from-accent-blue/30 hover:to-accent-blue/10
                              transition-all duration-200
-                             disabled:opacity-30 disabled:cursor-not-allowed
-                             shadow-[0_0_20px_rgba(0,229,255,0.1)]"
+                             disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   <FileText size={14} />
                   Generate Appeal Packet

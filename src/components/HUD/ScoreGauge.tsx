@@ -85,7 +85,7 @@ export default function ScoreGauge({ score, riskLevel: riskLevelProp }: ScoreGau
             cy={CENTER}
             r={RADIUS}
             fill="none"
-            stroke="rgba(255,255,255,0.06)"
+            stroke="rgba(0,0,0,0.06)"
             strokeWidth={STROKE_WIDTH}
           />
           {/* Glow shadow */}
@@ -117,7 +117,7 @@ export default function ScoreGauge({ score, riskLevel: riskLevelProp }: ScoreGau
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <motion.span
             className="text-4xl font-bold text-text-primary"
-            style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+            style={{ fontFamily: "'DM Sans', sans-serif" }}
           >
             {displayScore}
           </motion.span>

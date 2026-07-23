@@ -82,10 +82,10 @@ export default function SampleCaseSelector({ onSelectCase }: SampleCaseSelectorP
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="w-full glass-card px-4 py-3 flex items-center gap-3 text-left
-                   hover:border-accent-cyan/30 transition-all duration-200 group"
+                   hover:border-accent-blue/30 transition-all duration-200 group"
       >
-        <div className="p-1.5 rounded-md bg-accent-cyan/10 flex-shrink-0">
-          <Stethoscope size={16} className="text-accent-cyan" />
+        <div className="p-1.5 rounded-md bg-accent-blue/10 flex-shrink-0">
+          <Stethoscope size={16} className="text-accent-blue" />
         </div>
         <div className="flex-1 min-w-0">
           {selectedCase ? (
@@ -109,7 +109,7 @@ export default function SampleCaseSelector({ onSelectCase }: SampleCaseSelectorP
           transition={{ duration: 0.2 }}
           className="flex-shrink-0"
         >
-          <ChevronDown size={16} className="text-text-secondary group-hover:text-accent-cyan transition-colors" />
+          <ChevronDown size={16} className="text-text-secondary group-hover:text-accent-blue transition-colors" />
         </motion.div>
       </button>
 
@@ -129,9 +129,9 @@ export default function SampleCaseSelector({ onSelectCase }: SampleCaseSelectorP
                   key={c.id}
                   onClick={() => handleSelect(c)}
                   className={`w-full px-4 py-3 flex items-center gap-3 text-left
-                              hover:bg-accent-cyan/5 transition-colors duration-150
-                              border-b border-accent-cyan/5 last:border-b-0
-                              ${selectedCase?.id === c.id ? 'bg-accent-cyan/5' : ''}`}
+                              hover:bg-accent-blue/5 transition-colors duration-150
+                              border-b border-border-light last:border-b-0
+                              ${selectedCase?.id === c.id ? 'bg-accent-blue/5' : ''}`}
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-text-primary truncate">{c.label}</p>

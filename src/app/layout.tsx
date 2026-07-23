@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
-import { Plus_Jakarta_Sans, Inter } from 'next/font/google';
+import { DM_Sans, Inter } from 'next/font/google';
 import './globals.css';
 
-const plusJakartaSans = Plus_Jakarta_Sans({
+const dmSans = DM_Sans({
   subsets: ['latin'],
-  variable: '--font-plus-jakarta',
+  variable: '--font-dm-sans',
   display: 'swap',
 });
 
@@ -31,7 +31,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${plusJakartaSans.variable} ${inter.variable}`}
+      className={`${dmSans.variable} ${inter.variable}`}
     >
       <body className="min-h-screen bg-bg-primary text-text-primary antialiased">
         {children}

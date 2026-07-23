@@ -19,7 +19,7 @@ export default function ChartEditor({ value, onChange }: ChartEditorProps) {
   return (
     <div className="glass-card overflow-hidden flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-accent-cyan/10">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border-light">
         <div className="flex items-center gap-2.5">
           <h3 className="text-sm font-semibold text-text-primary">Clinical Chart Note</h3>
         </div>
@@ -49,17 +49,17 @@ export default function ChartEditor({ value, onChange }: ChartEditorProps) {
                 exit={{ opacity: 0, y: 4, scale: 0.95 }}
                 transition={{ duration: 0.18 }}
                 className="absolute right-0 top-full mt-2 w-64 p-3 rounded-lg
-                           bg-bg-secondary border border-accent-cyan/20 shadow-xl z-50"
+                           bg-white border border-border-light shadow-xl z-50"
               >
                 <div className="flex items-start gap-2">
-                  <Info size={14} className="text-accent-cyan flex-shrink-0 mt-0.5" />
+                  <Info size={14} className="text-accent-blue flex-shrink-0 mt-0.5" />
                   <p className="text-xs text-text-secondary leading-relaxed">
                     All PHI is anonymized client-side before transmission. No protected health
                     information leaves your browser.
                   </p>
                 </div>
                 {/* Arrow */}
-                <div className="absolute -top-1.5 right-4 w-3 h-3 rotate-45 bg-bg-secondary border-l border-t border-accent-cyan/20" />
+                <div className="absolute -top-1.5 right-4 w-3 h-3 rotate-45 bg-white border-l border-t border-border-light" />
               </motion.div>
             )}
           </AnimatePresence>
@@ -72,10 +72,10 @@ export default function ChartEditor({ value, onChange }: ChartEditorProps) {
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="Enter or paste clinical chart notes here..."
-          className="w-full h-full min-h-[280px] bg-bg-primary border border-accent-cyan/10
+          className="w-full h-full min-h-[280px] bg-bg-secondary border border-border-light
                      rounded-lg p-4 text-sm text-text-primary placeholder-text-secondary/40
-                     resize-y focus:outline-none focus:border-accent-cyan/40
-                     focus:ring-1 focus:ring-accent-cyan/20 transition-all duration-200
+                     resize-y focus:outline-none focus:border-accent-blue/40
+                     focus:ring-1 focus:ring-accent-blue/20 transition-all duration-200
                      font-mono leading-relaxed"
           style={{
             fontFamily:

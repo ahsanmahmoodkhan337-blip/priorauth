@@ -43,7 +43,7 @@ export default function OCRUploadButton({ onOCRComplete, selectedCaseId }: OCRUp
       onClick={handleClick}
       disabled={isSimulating}
       className="w-full glass-card px-4 py-3 flex items-center gap-3
-                 border-accent-cyan/20 hover:border-accent-cyan/40
+                 border-accent-blue/20 hover:border-accent-blue/40
                  transition-all duration-200 group disabled:opacity-70"
     >
       <div className="relative flex-shrink-0">
@@ -62,21 +62,21 @@ export default function OCRUploadButton({ onOCRComplete, selectedCaseId }: OCRUp
               ? { duration: 0.8, repeat: Infinity }
               : {}
           }
-          className="p-1.5 rounded-md bg-accent-cyan/10"
+          className="p-1.5 rounded-md bg-accent-blue/10"
         >
-          <Upload size={16} className="text-accent-cyan" />
+          <Upload size={16} className="text-accent-blue" />
         </motion.div>
         {isSimulating && (
           <motion.div
             className="absolute inset-0 rounded-md"
-            animate={{ boxShadow: ['0 0 0px rgba(0,229,255,0)', '0 0 16px rgba(0,229,255,0.4)', '0 0 0px rgba(0,229,255,0)'] }}
+            animate={{ boxShadow: ['0 0 0px rgba(30,92,212,0)', '0 0 16px rgba(30,92,212,0.4)', '0 0 0px rgba(30,92,212,0)'] }}
             transition={{ duration: 1.5, repeat: Infinity }}
           />
         )}
       </div>
 
       <div className="flex-1 text-left">
-        <p className="text-sm font-medium text-text-primary group-hover:text-accent-cyan transition-colors">
+        <p className="text-sm font-medium text-text-primary group-hover:text-accent-blue transition-colors">
           {isSimulating ? 'Processing OCR...' : 'Upload Chart Image (OCR Simulated)'}
         </p>
         <p className="text-[10px] text-text-secondary mt-0.5">
@@ -88,7 +88,7 @@ export default function OCRUploadButton({ onOCRComplete, selectedCaseId }: OCRUp
         </p>
       </div>
 
-      <FileText size={14} className="text-text-secondary group-hover:text-accent-cyan transition-colors flex-shrink-0" />
+      <FileText size={14} className="text-text-secondary group-hover:text-accent-blue transition-colors flex-shrink-0" />
     </button>
   );
 }
