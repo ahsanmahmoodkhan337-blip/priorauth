@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import ModeToggle from '@/components/HUD/ModeToggle';
+import GuidelineUpdater from '@/components/HUD/GuidelineUpdater';
 
 export default function Navbar() {
   const [mode, setMode] = useState<'student' | 'b2b'>('student');
@@ -38,8 +39,9 @@ export default function Navbar() {
             </div>
           </div>
 
-          {/* Right: Mode Toggle only */}
-          <div className="flex items-center gap-4 sm:gap-6">
+          {/* Right: Guideline Updater + Mode Toggle */}
+          <div className="flex items-center gap-3 sm:gap-4">
+            <GuidelineUpdater />
             <ModeToggle mode={mode} onToggle={handleToggleMode} />
           </div>
         </div>

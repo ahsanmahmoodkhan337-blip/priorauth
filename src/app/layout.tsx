@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { DM_Sans, Inter } from 'next/font/google';
+import DeepAICopilotWrapper from '@/components/HUD/DeepAICopilotWrapper';
 import './globals.css';
 
 const dmSans = DM_Sans({
@@ -35,6 +36,7 @@ export default function RootLayout({
     >
       <body className="min-h-screen bg-bg-primary text-text-primary antialiased">
         {children}
+        <DeepAICopilotWrapper />
       </body>
     </html>
   );
