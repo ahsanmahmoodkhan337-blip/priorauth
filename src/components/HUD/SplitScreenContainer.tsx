@@ -17,6 +17,12 @@ import FaxPacketAssembler from '@/components/HUD/FaxPacketAssembler';
 import StatuteClock from '@/components/HUD/StatuteClock';
 import PatientNotifier from '@/components/HUD/PatientNotifier';
 import SessionKeepAlive from '@/components/HUD/SessionKeepAlive';
+import RxStepTherapy from '@/components/HUD/RxStepTherapy';
+import AppealEngine from '@/components/HUD/AppealEngine';
+import RetroPAMode from '@/components/HUD/RetroPAMode';
+import PortalSSOVault from '@/components/HUD/PortalSSOVault';
+import AudioBrief from '@/components/HUD/AudioBrief';
+import CopayMatcher from '@/components/HUD/CopayMatcher';
 
 // ---------------------------------------------------------------------------
 // Types — mirrored from the evaluation engine & API
@@ -106,6 +112,15 @@ export default function SplitScreenContainer() {
   const [isFaxOpen, setIsFaxOpen] = useState(false);
   const [isPatientNotifierOpen, setIsPatientNotifierOpen] = useState(false);
   const [isWorkloadToolsExpanded, setIsWorkloadToolsExpanded] = useState(false);
+  const [isPACommandCenterExpanded, setIsPACommandCenterExpanded] = useState(false);
+
+  // ---- PA-OS Module State --------------------------------------------------
+  const [isRxStepTherapyOpen, setIsRxStepTherapyOpen] = useState(false);
+  const [isAppealEngineOpen, setIsAppealEngineOpen] = useState(false);
+  const [isRetroPAModeOpen, setIsRetroPAModeOpen] = useState(false);
+  const [isPortalSSOVaultOpen, setIsPortalSSOVaultOpen] = useState(false);
+  const [isAudioBriefOpen, setIsAudioBriefOpen] = useState(false);
+  const [isCopayMatcherOpen, setIsCopayMatcherOpen] = useState(false);
 
   // ---- Handlers -----------------------------------------------------------
 
@@ -479,6 +494,130 @@ export default function SplitScreenContainer() {
                   </div>
                 </div>
               </div>
+
+              {/* ---- Prior Auth Command Center (PA-OS Enterprise Modules) ---- */}
+              <div className="border-t border-border-light mt-2 pt-2">
+                <button
+                  onClick={() => setIsPACommandCenterExpanded((prev) => !prev)}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg
+                             hover:bg-accent-blue/5 transition-colors duration-200 group"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="p-1 rounded bg-accent-blue/10">
+                      <span className="text-sm">🏛️</span>
+                    </div>
+                    <span className="text-xs font-semibold text-text-primary">
+                      Prior Auth Command Center
+                    </span>
+                  </div>
+                  {isPACommandCenterExpanded ? (
+                    <ChevronUp size={14} className="text-text-secondary group-hover:text-text-primary transition-colors" />
+                  ) : (
+                    <ChevronDown size={14} className="text-text-secondary group-hover:text-text-primary transition-colors" />
+                  )}
+                </button>
+
+                {/* Expandable PA-OS Grid */}
+                <div
+                  className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                    isPACommandCenterExpanded ? 'max-h-[1200px] opacity-100 mt-2' : 'max-h-0 opacity-0'
+                  }`}
+                >
+                  <div className="px-3 pb-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      {/* Module 1: Rx Step-Therapy */}
+                      <button
+                        onClick={() => setIsRxStepTherapyOpen(true)}
+                        className="rounded-lg border border-accent-blue/20 bg-accent-blue/3 p-2.5 text-left
+                                   hover:border-accent-blue/40 hover:bg-accent-blue/5 transition-all duration-200 group"
+                      >
+                        <span className="text-base">💊</span>
+                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
+                          Specialty Rx & Step-Therapy
+                        </p>
+                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
+                          Formulary lookup + exception letters
+                        </p>
+                      </button>
+
+                      {/* Module 2: Appeal Engine */}
+                      <button
+                        onClick={() => setIsAppealEngineOpen(true)}
+                        className="rounded-lg border border-accent-gold/20 bg-accent-gold/3 p-2.5 text-left
+                                   hover:border-accent-gold/40 hover:bg-accent-gold/5 transition-all duration-200 group"
+                      >
+                        <span className="text-base">📋</span>
+                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
+                          Multi-Tier Appeal Tracker
+                        </p>
+                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
+                          Level 1 → IRO escalation
+                        </p>
+                      </button>
+
+                      {/* Module 3: Retro-PA Mode */}
+                      <button
+                        onClick={() => setIsRetroPAModeOpen(true)}
+                        className="rounded-lg border border-status-red/20 bg-status-red/3 p-2.5 text-left
+                                   hover:border-status-red/40 hover:bg-status-red/5 transition-all duration-200 group"
+                      >
+                        <span className="text-base">🚨</span>
+                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
+                          72-Hour Retro-PA Mode
+                        </p>
+                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
+                          EMTALA emergency authorization
+                        </p>
+                      </button>
+
+                      {/* Module 4: Portal SSO Vault */}
+                      <button
+                        onClick={() => setIsPortalSSOVaultOpen(true)}
+                        className="rounded-lg border border-bg-navy/20 bg-bg-navy/3 p-2.5 text-left
+                                   hover:border-bg-navy/40 hover:bg-bg-navy/5 transition-all duration-200 group"
+                      >
+                        <span className="text-base">🔑</span>
+                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
+                          Portal SSO Vault
+                        </p>
+                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
+                          AES-256 encrypted credentials
+                        </p>
+                      </button>
+
+                      {/* Module 5: Audio Brief */}
+                      <button
+                        onClick={() => setIsAudioBriefOpen(true)}
+                        className="rounded-lg border border-status-green/20 bg-status-green/3 p-2.5 text-left
+                                   hover:border-status-green/40 hover:bg-status-green/5 transition-all duration-200 group"
+                      >
+                        <span className="text-base">🎧</span>
+                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
+                          60-Sec Doctor Audio Brief
+                        </p>
+                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
+                          AI P2P call prep script
+                        </p>
+                      </button>
+
+                      {/* Module 6: Copay Matcher */}
+                      <button
+                        onClick={() => setIsCopayMatcherOpen(true)}
+                        className="rounded-lg border border-accent-gold/20 bg-accent-gold/3 p-2.5 text-left
+                                   hover:border-accent-gold/40 hover:bg-accent-gold/5 transition-all duration-200 group"
+                      >
+                        <span className="text-base">💰</span>
+                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
+                          Copay Assistance Programs
+                        </p>
+                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
+                          Manufacturer + foundation match
+                        </p>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -515,6 +654,39 @@ export default function SplitScreenContainer() {
         onClose={() => setIsPatientNotifierOpen(false)}
         payerName={payerName ?? ''}
         procedureName={evalResult?.procedureName ?? ''}
+      />
+
+      {/* ---- PA-OS Enterprise Module Modals ---- */}
+      <RxStepTherapy
+        isOpen={isRxStepTherapyOpen}
+        onClose={() => setIsRxStepTherapyOpen(false)}
+      />
+
+      <AppealEngine
+        isOpen={isAppealEngineOpen}
+        onClose={() => setIsAppealEngineOpen(false)}
+      />
+
+      <RetroPAMode
+        isOpen={isRetroPAModeOpen}
+        onClose={() => setIsRetroPAModeOpen(false)}
+      />
+
+      <PortalSSOVault
+        isOpen={isPortalSSOVaultOpen}
+        onClose={() => setIsPortalSSOVaultOpen(false)}
+      />
+
+      <AudioBrief
+        isOpen={isAudioBriefOpen}
+        onClose={() => setIsAudioBriefOpen(false)}
+      />
+
+      <CopayMatcher
+        isOpen={isCopayMatcherOpen}
+        onClose={() => setIsCopayMatcherOpen(false)}
+        cptCode={cptCode}
+        procedureName={evalResult?.procedureName}
       />
     </>
   );
