@@ -8,6 +8,7 @@ import { CaseProvider } from '@/lib/useCaseState';
 import Navbar from '@/components/Navbar';
 import GuidelineSyncBar from '@/components/GuidelineSyncBar';
 import SplitScreenContainer from '@/components/HUD/SplitScreenContainer';
+import DeepAICopilotWrapper from '@/components/HUD/DeepAICopilotWrapper';
 import Footer from '@/components/Footer';
 
 interface StudentAuth {
@@ -127,6 +128,7 @@ export default function WorkspacePage() {
       </main>
 
       <Footer />
+      <DeepAICopilotWrapper />
     </div>
   );
 }
