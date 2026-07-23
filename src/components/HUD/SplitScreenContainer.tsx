@@ -35,6 +35,14 @@ import EHRWriteBack from '@/components/HUD/EHRWriteBack';
 import OmniSubmission from '@/components/HUD/OmniSubmission';
 import P2PWhisper from '@/components/HUD/P2PWhisper';
 import CMSEnforcer from '@/components/HUD/CMSEnforcer';
+import PDFSnipper from '@/components/HUD/PDFSnipper';
+import DocSignatureBridge from '@/components/HUD/DocSignatureBridge';
+import VoiceBot from '@/components/HUD/VoiceBot';
+import KanbanTracker from '@/components/HUD/KanbanTracker';
+import ProviderVault from '@/components/HUD/ProviderVault';
+import BenefitRouter from '@/components/HUD/BenefitRouter';
+import ControlRoom from '@/components/HUD/ControlRoom';
+import ROITelemetry from '@/components/HUD/ROITelemetry';
 
 // ---------------------------------------------------------------------------
 // Types — mirrored from the evaluation engine & API
@@ -151,6 +159,16 @@ export default function SplitScreenContainer() {
   const [isOmniSubmissionOpen, setIsOmniSubmissionOpen] = useState(false);
   const [isP2PWhisperOpen, setIsP2PWhisperOpen] = useState(false);
   const [isCMSEnforcerOpen, setIsCMSEnforcerOpen] = useState(false);
+
+  // ---- Standalone Architecture Modules State ---------------------------------
+  const [isStandaloneExpanded, setIsStandaloneExpanded] = useState(false);
+  const [isPDFSnipperOpen, setIsPDFSnipperOpen] = useState(false);
+  const [isDocSignatureBridgeOpen, setIsDocSignatureBridgeOpen] = useState(false);
+  const [isVoiceBotOpen, setIsVoiceBotOpen] = useState(false);
+  const [isKanbanTrackerOpen, setIsKanbanTrackerOpen] = useState(false);
+  const [isProviderVaultOpen, setIsProviderVaultOpen] = useState(false);
+  const [isBenefitRouterOpen, setIsBenefitRouterOpen] = useState(false);
+  const [isControlRoomOpen, setIsControlRoomOpen] = useState(false);
 
   // ---- Handlers -----------------------------------------------------------
 
@@ -918,6 +936,150 @@ export default function SplitScreenContainer() {
                   </div>
                 </div>
               </div>
+
+              {/* ---- 🧩 Standalone Architecture Modules ---- */}
+              <div className="border-t border-border-light mt-2 pt-2">
+                <button
+                  onClick={() => setIsStandaloneExpanded((prev) => !prev)}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg
+                             hover:bg-[#00E676]/5 transition-colors duration-200 group"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="p-1 rounded bg-[#00E676]/10">
+                      <span className="text-sm">🧩</span>
+                    </div>
+                    <span className="text-xs font-semibold text-text-primary">
+                      🧩 Standalone Architecture Modules
+                    </span>
+                  </div>
+                  {isStandaloneExpanded ? (
+                    <ChevronUp size={14} className="text-text-secondary group-hover:text-text-primary transition-colors" />
+                  ) : (
+                    <ChevronDown size={14} className="text-text-secondary group-hover:text-text-primary transition-colors" />
+                  )}
+                </button>
+
+                {/* Expandable Grid */}
+                <div
+                  className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                    isStandaloneExpanded ? 'max-h-[1400px] opacity-100 mt-2' : 'max-h-0 opacity-0'
+                  }`}
+                >
+                  <div className="px-3 pb-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      {/* Module 1: PDF Snipper */}
+                      <button
+                        onClick={() => setIsPDFSnipperOpen(true)}
+                        className="rounded-lg border border-[#1E5CD4]/20 bg-[#1E5CD4]/3 p-2.5 text-left
+                                   hover:border-[#1E5CD4]/40 hover:bg-[#1E5CD4]/5 transition-all duration-200 group"
+                      >
+                        <span className="text-base">📄</span>
+                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
+                          OCR PDF Snipper
+                        </p>
+                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
+                          Drag-drop + evidence binder
+                        </p>
+                      </button>
+
+                      {/* Module 2: Doc Signature Bridge */}
+                      <button
+                        onClick={() => setIsDocSignatureBridgeOpen(true)}
+                        className="rounded-lg border border-[#FAD23B]/20 bg-[#FAD23B]/3 p-2.5 text-left
+                                   hover:border-[#FAD23B]/40 hover:bg-[#FAD23B]/5 transition-all duration-200 group"
+                      >
+                        <span className="text-base">📱</span>
+                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
+                          Doc Signature Bridge
+                        </p>
+                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
+                          SMS digital signature addendum
+                        </p>
+                      </button>
+
+                      {/* Module 3: Voice AI Bot */}
+                      <button
+                        onClick={() => setIsVoiceBotOpen(true)}
+                        className="rounded-lg border border-[#0B1F3A]/20 bg-[#0B1F3A]/3 p-2.5 text-left
+                                   hover:border-[#0B1F3A]/40 hover:bg-[#0B1F3A]/5 transition-all duration-200 group"
+                      >
+                        <span className="text-base">🤖</span>
+                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
+                          Voice AI Phone Bot
+                        </p>
+                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
+                          Auto IVR + PA status retrieval
+                        </p>
+                      </button>
+
+                      {/* Module 4: Kanban Tracker */}
+                      <button
+                        onClick={() => setIsKanbanTrackerOpen(true)}
+                        className="rounded-lg border border-[#1E5CD4]/20 bg-[#1E5CD4]/3 p-2.5 text-left
+                                   hover:border-[#1E5CD4]/40 hover:bg-[#1E5CD4]/5 transition-all duration-200 group"
+                      >
+                        <span className="text-base">📋</span>
+                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
+                          Master PA Kanban
+                        </p>
+                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
+                          Visual drag-drop workflow tracker
+                        </p>
+                      </button>
+
+                      {/* Module 5: Provider Vault */}
+                      <button
+                        onClick={() => setIsProviderVaultOpen(true)}
+                        className="rounded-lg border border-[#0B1F3A]/20 bg-[#0B1F3A]/3 p-2.5 text-left
+                                   hover:border-[#0B1F3A]/40 hover:bg-[#0B1F3A]/5 transition-all duration-200 group"
+                      >
+                        <span className="text-base">🔑</span>
+                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
+                          Provider Credentials Vault
+                        </p>
+                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
+                          NPI, PTAN, license storage
+                        </p>
+                      </button>
+
+                      {/* Module 6: Benefit Router */}
+                      <button
+                        onClick={() => setIsBenefitRouterOpen(true)}
+                        className="rounded-lg border border-[#FAD23B]/20 bg-[#FAD23B]/3 p-2.5 text-left
+                                   hover:border-[#FAD23B]/40 hover:bg-[#FAD23B]/5 transition-all duration-200 group"
+                      >
+                        <span className="text-base">🔀</span>
+                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
+                          Dual-Silo Benefit Router
+                        </p>
+                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
+                          Pharmacy vs Medical routing
+                        </p>
+                      </button>
+
+                      {/* Module 7: Control Room */}
+                      <button
+                        onClick={() => setIsControlRoomOpen(true)}
+                        className="rounded-lg border border-[#1E5CD4]/20 bg-[#1E5CD4]/3 p-2.5 text-left
+                                   hover:border-[#1E5CD4]/40 hover:bg-[#1E5CD4]/5 transition-all duration-200 group"
+                      >
+                        <span className="text-base">🏢</span>
+                        <p className="text-[10px] font-semibold text-text-primary mt-1 leading-tight">
+                          Multi-Practice Control Room
+                        </p>
+                        <p className="text-[9px] text-text-secondary/60 mt-0.5">
+                          Aggregated practice oversight
+                        </p>
+                      </button>
+
+                      {/* ROI Telemetry (mini inline widget) */}
+                      <div className="col-span-2 mt-1">
+                        <ROITelemetry compact />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1061,6 +1223,42 @@ export default function SplitScreenContainer() {
         onClose={() => setIsCMSEnforcerOpen(false)}
         payerName={payerName}
         cptCode={cptCode}
+      />
+
+      {/* ---- 🧩 Standalone Architecture Module Modals ---- */}
+      <PDFSnipper
+        isOpen={isPDFSnipperOpen}
+        onClose={() => setIsPDFSnipperOpen(false)}
+      />
+
+      <DocSignatureBridge
+        isOpen={isDocSignatureBridgeOpen}
+        onClose={() => setIsDocSignatureBridgeOpen(false)}
+      />
+
+      <VoiceBot
+        isOpen={isVoiceBotOpen}
+        onClose={() => setIsVoiceBotOpen(false)}
+      />
+
+      <KanbanTracker
+        isOpen={isKanbanTrackerOpen}
+        onClose={() => setIsKanbanTrackerOpen(false)}
+      />
+
+      <ProviderVault
+        isOpen={isProviderVaultOpen}
+        onClose={() => setIsProviderVaultOpen(false)}
+      />
+
+      <BenefitRouter
+        isOpen={isBenefitRouterOpen}
+        onClose={() => setIsBenefitRouterOpen(false)}
+      />
+
+      <ControlRoom
+        isOpen={isControlRoomOpen}
+        onClose={() => setIsControlRoomOpen(false)}
       />
     </>
   );
