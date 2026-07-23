@@ -44,20 +44,24 @@ function findKeywordInText(keyword: string, text: string): boolean {
   return pattern.test(text);
 }
 
+/** Special sentinel for keyword-less criteria that can't be auto-verified */
+const KEYWORD_LESS_SATISFIED = '__KEYWORD_LESS__';
+
 /**
  * Check a single criterion against the chart note text.
- * Returns the first matching keyword found (as the "chart citation")
- * or `null` if no keyword matched.
+ * Returns the first matching keyword found (as the "chart citation"),
+ * the sentinel `KEYWORD_LESS_SATISFIED` for criteria with no keywords
+ * (implying the criterion is treated as satisfied), or `null` if no
+ * keyword matched.
  */
 function evaluateCriterion(
   criterion: PolicyCriterion,
   chartNote: string
 ): string | null {
   if (criterion.keywords.length === 0) {
-    // Keyword-less criteria are always "satisfied" — they need external
-    // validation (like a date check).  The engine cannot decide, so we
-    // skip them and the caller must handle them separately.
-    return null;
+    // Keyword-less criteria (e.g., date-based) cannot be auto-verified,
+    // so we treat them as satisfied by default.
+    return KEYWORD_LESS_SATISFIED;
   }
   const lowerText = normalize(chartNote);
   for (const kw of criterion.keywords) {
@@ -189,7 +193,14 @@ export function evaluateChart(
   for (const criterion of policy.criteria) {
     const match = evaluateCriterion(criterion, chartNote);
 
-    if (match) {
+    if (match === KEYWORD_LESS_SATISFIED) {
+      // Cannot auto-verify (e.g., date-based) — treat as satisfied
+      satisfied.push({
+        id: criterion.id,
+        description: criterion.description,
+        chartCitation: 'Assumed satisfied — requires manual date/document verification',
+      });
+    } else if (match) {
       satisfied.push({
         id: criterion.id,
         description: criterion.description,
@@ -197,20 +208,10 @@ export function evaluateChart(
       });
     } else if (criterion.mandatory) {
       // Mandatory and no keyword hit — this is a missing requirement
-      let issue: string;
-      let recommendation: string;
-
-      if (criterion.keywords.length === 0) {
-        issue =
-          'Cannot automatically verify — this criterion requires manual date or document review';
-        recommendation =
-          'Verify this condition manually and attach supporting documentation if met';
-      } else {
-        issue =
-          'Required clinical documentation not found in the chart note';
-        recommendation =
-          'Add documentation addressing this criterion and resubmit';
-      }
+      const issue =
+        'Required clinical documentation not found in the chart note';
+      const recommendation =
+        'Add documentation addressing this criterion and resubmit';
 
       missing.push({
         id: criterion.id,
