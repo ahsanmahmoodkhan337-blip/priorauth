@@ -1,56 +1,38 @@
 import { NextResponse } from 'next/server';
-import { saveRequest, type AccessRequest } from '@/lib/serverStore';
+import { createClient } from '@supabase/supabase-js';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { fullName, phone, email, paymentMethod, transactionId, receiptSent } = body;
 
-    // Validate required fields
-    if (!fullName || typeof fullName !== 'string' || !fullName.trim()) {
-      return NextResponse.json(
-        { success: false, message: 'Full name is required.' },
-        { status: 400 }
-      );
-    }
+    if (!fullName?.trim()) return NextResponse.json({ success: false, message: 'Full name required.' }, { status: 400 });
+    if (!phone?.trim()) return NextResponse.json({ success: false, message: 'Phone required.' }, { status: 400 });
+    if (!transactionId?.trim()) return NextResponse.json({ success: false, message: 'Transaction ID required.' }, { status: 400 });
 
-    if (!phone || typeof phone !== 'string' || !phone.trim()) {
-      return NextResponse.json(
-        { success: false, message: 'Phone number is required.' },
-        { status: 400 }
-      );
-    }
-
-    if (!transactionId || typeof transactionId !== 'string' || !transactionId.trim()) {
-      return NextResponse.json(
-        { success: false, message: 'Transaction ID is required.' },
-        { status: 400 }
-      );
-    }
-
-    const newRequest: AccessRequest = {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
+    
+    const supabase = createClient(url, key);
+    
+    const { error } = await supabase.from('access_requests').insert({
       id: crypto.randomUUID(),
-      fullName: fullName.trim(),
+      full_name: fullName.trim(),
       phone: phone.trim(),
-      email: (email && typeof email === 'string') ? email.trim() : '',
-      paymentMethod: paymentMethod || 'easypaisa',
-      transactionId: transactionId.trim(),
-      receiptSent: receiptSent === true,
+      email: email?.trim() || '',
+      payment_method: paymentMethod || 'easypaisa',
+      transaction_id: transactionId.trim(),
+      receipt_sent: receiptSent === true,
       status: 'pending',
-      submittedAt: new Date().toISOString(),
-    };
+      submitted_at: new Date().toISOString(),
+    });
 
-    await saveRequest(newRequest);
+    if (error) {
+      return NextResponse.json({ success: false, message: 'DB Error: ' + error.message }, { status: 500 });
+    }
 
-    return NextResponse.json(
-      { success: true, message: 'Access request submitted successfully' },
-      { status: 201 }
-    );
-  } catch (error) {
-    console.error('Enroll API error:', error);
-    return NextResponse.json(
-      { success: false, message: 'An unexpected error occurred. Please try again.' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: true, message: 'Submitted!' }, { status: 201 });
+  } catch (e: any) {
+    return NextResponse.json({ success: false, message: 'Error: ' + (e?.message || 'unknown') }, { status: 500 });
   }
 }
