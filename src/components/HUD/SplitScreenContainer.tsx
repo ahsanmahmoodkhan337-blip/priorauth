@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { FileText, BarChart3, BookOpen } from 'lucide-react';
+import { FileText, BarChart3, BookOpen, Loader2, AlertCircle } from 'lucide-react';
 import SampleCaseSelector from '@/components/HUD/SampleCaseSelector';
+import type { SampleCaseData } from '@/components/HUD/SampleCaseSelector';
 import ChartEditor from '@/components/HUD/ChartEditor';
 import OCRUploadButton from '@/components/HUD/OCRUploadButton';
 import ScoreGauge from '@/components/HUD/ScoreGauge';
@@ -11,7 +12,7 @@ import PolicyCitationDrawer from '@/components/HUD/PolicyCitationDrawer';
 import PacketGeneratorModal from '@/components/HUD/PacketGeneratorModal';
 
 // ---------------------------------------------------------------------------
-// Placeholder data — wired for UI demo. Replace with real API results later.
+// Types — mirrored from the evaluation engine & API
 // ---------------------------------------------------------------------------
 
 interface SatisfiedCriterion {
@@ -32,7 +33,7 @@ interface PolicyCriterion {
   description: string;
 }
 
-interface Policy {
+interface PolicyShape {
   payerName: string;
   cptCode: string;
   lcdNumber: string;
@@ -40,211 +41,43 @@ interface Policy {
   criteria: PolicyCriterion[];
 }
 
-interface CaseEvalResult {
-  score: number;
+interface EvaluationApiResponse {
+  approvalScore: number;
   riskLevel: 'Low' | 'Medium' | 'High';
   satisfiedCriteria: SatisfiedCriterion[];
   missingCriteria: MissingCriterion[];
-  policy: Policy;
-  letter: string;
+  justificationLetter: string;
+  payerName: string;
+  cptCode: string;
+  procedureName: string;
 }
 
-const PLACEHOLDER_RESULTS: Record<string, CaseEvalResult> = {
-  'lumbar-mri': {
-    score: 38,
-    riskLevel: 'High',
-    satisfiedCriteria: [
-      {
-        id: 'sat-1',
-        description: 'Clinical signs of radiculopathy documented',
-        chartCitation: 'Chart: "Positive straight leg raise at 40°, diminished right Achilles reflex"',
-      },
+// ---------------------------------------------------------------------------
+// Helper — derive LCD-like policies for drawer display from the raw API shape
+// ---------------------------------------------------------------------------
+
+function derivePolicyForDrawer(apiResult: EvaluationApiResponse): PolicyShape {
+  return {
+    payerName: apiResult.payerName,
+    cptCode: apiResult.cptCode,
+    lcdNumber: 'N/A',
+    versionDate: new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }),
+    criteria: [
+      ...apiResult.satisfiedCriteria.map((c) => ({
+        id: c.id,
+        description: c.description,
+      })),
+      ...apiResult.missingCriteria.map((c) => ({
+        id: c.id,
+        description: c.description,
+      })),
     ],
-    missingCriteria: [
-      {
-        id: 'miss-1',
-        description: 'Minimum 6 weeks conservative management required',
-        issue: 'Only 8 weeks PT documented — Aetna requires 12 weeks comprehensive conservative care',
-        recommendedAction: 'Document additional 4 weeks of structured PT with progress notes.',
-      },
-      {
-        id: 'miss-2',
-        description: 'Prior X-ray within 6 months required',
-        issue: 'X-ray performed but report date > 6 months old at time of request',
-        recommendedAction: 'Obtain updated weight-bearing X-rays before resubmission.',
-      },
-      {
-        id: 'miss-3',
-        description: 'Failure of at least 2 epidural steroid injections',
-        issue: 'Only one ESI documented with clear failure; payer requires minimum of two attempts',
-        recommendedAction: 'Administer second ESI or document contraindication with supporting rationale.',
-      },
-    ],
-    policy: {
-      payerName: 'Aetna',
-      cptCode: '72148',
-      lcdNumber: 'L37842',
-      versionDate: '2026-06-15',
-      criteria: [
-        { id: 'pc-1', description: 'Clinical evidence of radiculopathy with sensory or motor deficits on physical examination' },
-        { id: 'pc-2', description: 'Minimum 12 weeks of structured conservative management (PT, NSAIDs, activity modification)' },
-        { id: 'pc-3', description: 'Plain radiographs (X-ray) within preceding 6 months' },
-        { id: 'pc-4', description: 'Failure of at least two therapeutic epidural steroid injections' },
-        { id: 'pc-5', description: 'Surgical consultation note when surgical intervention anticipated' },
-      ],
-    },
-    letter: `PRIOR AUTHORIZATION JUSTIFICATION LETTER
-=============================================
-Date: July 23, 2026
-To: Aetna Utilization Management
-Re: CPT 72148 — MRI Lumbar Spine without Contrast
-Patient ID: [REDACTED]
-
-Dear Medical Reviewer,
-
-This letter serves as a formal request for prior authorization of a lumbar spine MRI (CPT 72148) for the above-referenced patient.
-
-CLINICAL SUMMARY:
-57-year-old male with 6+ months of chronic low back pain radiating to the right leg. Physical exam reveals a positive straight leg raise at 40°, diminished right Achilles reflex, and 4/5 strength in right plantar flexion — objective findings consistent with L5-S1 radiculopathy.
-
-MEDICAL NECESSITY JUSTIFICATION:
-The patient has failed comprehensive conservative management including 8 weeks of structured physical therapy, NSAID therapy, and an epidural steroid injection without lasting relief. While the payer policy requires 12 weeks of conservative care, the severity and progression of neurological deficits warrant expedited imaging to rule out surgical pathology.
-
-We respectfully request authorization for this medically necessary study to prevent further neurological deterioration and guide appropriate surgical planning.
-
-Sincerely,
-[Provider Name, MD]
-[Provider NPI]
-[Date]`,
-  },
-
-  'knee-arthroplasty': {
-    score: 72,
-    riskLevel: 'Medium',
-    satisfiedCriteria: [
-      {
-        id: 'sat-1',
-        description: 'Radiographic evidence of advanced OA (K-L grade 4)',
-        chartCitation: 'Chart: "Kellgren-Lawrence grade 4 OA right knee" on X-ray',
-      },
-      {
-        id: 'sat-2',
-        description: 'Failure of conservative management > 3 months',
-        chartCitation: 'Chart: "Failed PT, corticosteroid injections, viscosupplementation"',
-      },
-      {
-        id: 'sat-3',
-        description: 'Significant functional limitation documented',
-        chartCitation: 'Chart: "Painful ROM 5-90°, varus deformity"',
-      },
-    ],
-    missingCriteria: [
-      {
-        id: 'miss-1',
-        description: 'BMI documentation and weight management counseling',
-        issue: 'BMI 32 documented but no evidence of formal weight management program participation',
-        recommendedAction: 'Document enrollment or referral to a structured weight management program.',
-      },
-    ],
-    policy: {
-      payerName: 'Blue Cross Blue Shield',
-      cptCode: '27447',
-      lcdNumber: 'L35125',
-      versionDate: '2026-04-01',
-      criteria: [
-        { id: 'pc-1', description: 'Advanced joint disease confirmed by radiography (K-L grade 3 or 4)' },
-        { id: 'pc-2', description: 'Failure of at least 3 months of non-surgical management' },
-        { id: 'pc-3', description: 'Significant pain and functional limitation affecting ADLs' },
-        { id: 'pc-4', description: 'BMI < 40 or documented participation in weight management program' },
-        { id: 'pc-5', description: 'Pre-operative medical clearance' },
-      ],
-    },
-    letter: `PRIOR AUTHORIZATION JUSTIFICATION LETTER
-=============================================
-Date: July 23, 2026
-To: BCBS Utilization Management
-Re: CPT 27447 — Total Knee Arthroplasty, Right
-Patient ID: [REDACTED]
-
-Dear Medical Reviewer,
-
-This letter requests prior authorization for a right total knee arthroplasty (CPT 27447).
-
-CLINICAL SUMMARY:
-68-year-old female with end-stage tricompartmental osteoarthritis of the right knee (Kellgren-Lawrence grade 4). The patient has exhausted all conservative measures including physical therapy, multiple corticosteroid injections, and viscosupplementation over 3+ years.
-
-MEDICAL NECESSITY JUSTIFICATION:
-Radiographic and clinical findings confirm advanced degenerative joint disease refractory to comprehensive non-surgical management. The patient meets all major BCBS criteria: radiographic severity, failure of conservative treatment, and significant functional limitation.
-
-We request authorization for this medically necessary procedure.
-
-Sincerely,
-[Provider Name, MD]
-[Provider NPI]`,
-  },
-
-  'cardiac-echo': {
-    score: 91,
-    riskLevel: 'Low',
-    satisfiedCriteria: [
-      {
-        id: 'sat-1',
-        description: 'Clinical signs/symptoms of heart failure documented',
-        chartCitation: 'Chart: "DOE, orthopnea, JVD, bibasilar crackles, 2+ pitting edema"',
-      },
-      {
-        id: 'sat-2',
-        description: 'Elevated BNP consistent with CHF',
-        chartCitation: 'Chart: "BNP 1,200 pg/mL (elevated)"',
-      },
-      {
-        id: 'sat-3',
-        description: 'No prior echo within 6 months',
-        chartCitation: 'Chart: No prior echocardiogram documented',
-      },
-      {
-        id: 'sat-4',
-        description: 'Physical exam findings support cardiac evaluation',
-        chartCitation: 'Chart: "Sinus tachycardia, non-specific ST-T changes on ECG"',
-      },
-    ],
-    missingCriteria: [],
-    policy: {
-      payerName: 'Medicare MAC (Novitas)',
-      cptCode: '93306',
-      lcdNumber: 'L35036',
-      versionDate: '2026-05-01',
-      criteria: [
-        { id: 'pc-1', description: 'Signs or symptoms of new or worsening cardiac disease' },
-        { id: 'pc-2', description: 'No prior echocardiogram within the preceding 6 months' },
-        { id: 'pc-3', description: 'Clinical findings that would impact management decisions' },
-        { id: 'pc-4', description: 'Elevated BNP or NT-proBNP when heart failure suspected' },
-      ],
-    },
-    letter: `PRIOR AUTHORIZATION JUSTIFICATION LETTER
-=============================================
-Date: July 23, 2026
-To: Medicare MAC (Novitas)
-Re: CPT 93306 — Transthoracic Echocardiogram, Complete
-Patient ID: [REDACTED]
-
-Dear Medical Reviewer,
-
-This letter requests prior authorization for a complete transthoracic echocardiogram (CPT 93306).
-
-CLINICAL SUMMARY:
-72-year-old male with known CAD, hypertension, and type 2 DM presenting with new-onset heart failure symptoms including dyspnea on exertion, orthopnea, bibasilar crackles, JVD, and bilateral pitting edema. BNP is markedly elevated at 1,200 pg/mL with sinus tachycardia on ECG.
-
-MEDICAL NECESSITY JUSTIFICATION:
-The patient meets all Medicare LCD criteria for echocardiography: new signs and symptoms of cardiac disease, elevated BNP consistent with decompensated heart failure, no recent echo, and clinical findings that will directly impact management (differentiation of HFpEF vs. HFrEF, evaluation for valvular pathology, and guidance of GDMT initiation).
-
-This study is medically necessary and time-sensitive. We request expedited authorization.
-
-Sincerely,
-[Provider Name, MD]
-[Provider NPI]`,
-  },
-};
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -254,41 +87,104 @@ export default function SplitScreenContainer() {
   // ---- UI State -----------------------------------------------------------
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [chartNote, setChartNote] = useState('');
-  const [evalResult, setEvalResult] = useState<CaseEvalResult | null>(null);
+  const [payerName, setPayerName] = useState<string | null>(null);
+  const [cptCode, setCptCode] = useState<string | null>(null);
+
+  const [evalResult, setEvalResult] = useState<EvaluationApiResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const [isPolicyOpen, setIsPolicyOpen] = useState(false);
   const [isPacketOpen, setIsPacketOpen] = useState(false);
 
   // ---- Handlers -----------------------------------------------------------
 
-  const handleSelectCase = useCallback((caseId: string) => {
-    setSelectedCaseId(caseId);
-    const result = PLACEHOLDER_RESULTS[caseId] || null;
-    setEvalResult(result);
-    // Optionally pre-fill chart note from sample data (for the OCR button flow)
-    if (result) {
-      // Don't auto-fill editor on case selection — user can use OCR button for that
-    }
+  const handleSelectCase = useCallback((caseData: SampleCaseData) => {
+    setSelectedCaseId(caseData.caseId);
+    setChartNote(caseData.chartNote);
+    setPayerName(caseData.payerName);
+    setCptCode(caseData.cptCode);
+    // Reset previous evaluation since chart/payer changed
+    setEvalResult(null);
+    setError(null);
   }, []);
 
+  const handleChartChange = useCallback((value: string) => {
+    setChartNote(value);
+    // Clear stale results when user edits the note
+    if (evalResult) {
+      setEvalResult(null);
+      setError(null);
+    }
+  }, [evalResult]);
+
+  /** Trigger the /api/audit-necessity endpoint */
+  const handleRunAudit = useCallback(async () => {
+    if (!chartNote.trim() || !payerName || !cptCode) {
+      setError(
+        'Please select a sample case (or enter a chart note) and ensure a payer and CPT code are available before running the audit.'
+      );
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    setEvalResult(null);
+
+    try {
+      const res = await fetch('/api/audit-necessity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chartNote: chartNote,
+          payerName,
+          cptCode,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(
+          data.error ?? `Server responded with status ${res.status}`
+        );
+      }
+
+      const data: EvaluationApiResponse = await res.json();
+      setEvalResult(data);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'An unexpected error occurred.';
+      setError(message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [chartNote, payerName, cptCode]);
+
+  /** Pseudo-OCR handler — just fills the editor */
   const handleOCRComplete = useCallback(
     (text: string, caseId?: string) => {
       setChartNote(text);
-      if (caseId) {
-        setSelectedCaseId(caseId);
-        const result = PLACEHOLDER_RESULTS[caseId] || null;
-        setEvalResult(result);
-      }
+      if (caseId) setSelectedCaseId(caseId);
+      setEvalResult(null);
+      setError(null);
     },
     []
   );
 
   // ---- Derived values -----------------------------------------------------
-  const score = evalResult?.score ?? 0;
+  const score = evalResult?.approvalScore ?? 0;
   const riskLevel = evalResult?.riskLevel ?? 'High';
-  const satisfiedCriteria = evalResult?.satisfiedCriteria ?? [];
-  const missingCriteria = evalResult?.missingCriteria ?? [];
-  const policy = evalResult?.policy ?? null;
-  const letter = evalResult?.letter ?? '';
+  const satisfiedCriteria: SatisfiedCriterion[] =
+    evalResult?.satisfiedCriteria ?? [];
+  const missingCriteria: MissingCriterion[] =
+    evalResult?.missingCriteria ?? [];
+  const policy: PolicyShape | null = evalResult
+    ? derivePolicyForDrawer(evalResult)
+    : null;
+  const letter = evalResult?.justificationLetter ?? '';
+
+  const canRunAudit =
+    chartNote.trim().length > 0 && payerName !== null && cptCode !== null;
 
   return (
     <>
@@ -300,7 +196,6 @@ export default function SplitScreenContainer() {
         {/* LEFT PANEL — Clinical Input                                       */}
         {/* ================================================================ */}
         <div className="flex-1 lg:w-1/2 flex flex-col gap-4 min-h-0">
-          {/* Panel Header */}
           <div className="glass-card p-1 flex-shrink-0">
             <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border-light">
               <div className="p-1.5 rounded-md bg-accent-blue/10">
@@ -316,21 +211,56 @@ export default function SplitScreenContainer() {
               </div>
             </div>
 
-            {/* Content area */}
             <div className="p-4 space-y-4">
               {/* Sample Case Selector */}
               <SampleCaseSelector onSelectCase={handleSelectCase} />
 
               {/* Chart Editor */}
               <div className="min-h-0">
-                <ChartEditor value={chartNote} onChange={setChartNote} />
+                <ChartEditor value={chartNote} onChange={handleChartChange} />
               </div>
 
-              {/* OCR Upload Button */}
-              <OCRUploadButton
-                onOCRComplete={handleOCRComplete}
-                selectedCaseId={selectedCaseId}
-              />
+              {/* ---- Action Row: Run Audit + OCR ---- */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                {/* Run Audit button */}
+                <button
+                  onClick={handleRunAudit}
+                  disabled={!canRunAudit || isLoading}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5
+                             rounded-lg bg-gradient-to-r from-accent-gold/80 to-accent-gold
+                             text-heading-navy text-xs font-semibold
+                             hover:brightness-110 transition-all duration-200
+                             disabled:opacity-40 disabled:cursor-not-allowed shadow-md"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      Evaluating...
+                    </>
+                  ) : (
+                    <>
+                      <BarChart3 size={14} />
+                      Run Audit
+                    </>
+                  )}
+                </button>
+
+                {/* OCR Upload Button */}
+                <OCRUploadButton
+                  onOCRComplete={handleOCRComplete}
+                  selectedCaseId={selectedCaseId}
+                />
+              </div>
+
+              {/* ---- Active payer / CPT badge ---- */}
+              {payerName && cptCode && (
+                <div className="flex items-center gap-2 text-[10px] text-text-secondary/70">
+                  <span className="px-2 py-0.5 rounded-full bg-accent-blue/10 text-accent-blue font-medium">
+                    {payerName}
+                  </span>
+                  <span>CPT {cptCode}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -354,58 +284,93 @@ export default function SplitScreenContainer() {
               </div>
             </div>
 
-            {/* Scrollable right panel content */}
-            <div className="overflow-y-auto p-4 space-y-6" style={{ maxHeight: 'calc(100vh - 14rem)' }}>
-              {/* Score Gauge */}
-              {evalResult ? (
-                <ScoreGauge score={score} riskLevel={riskLevel} />
-              ) : (
+            <div
+              className="overflow-y-auto p-4 space-y-6"
+              style={{ maxHeight: 'calc(100vh - 14rem)' }}
+            >
+              {/* ---- Loading state ---- */}
+              {isLoading && (
+                <div className="flex flex-col items-center justify-center py-10 gap-3">
+                  <Loader2 size={36} className="animate-spin text-accent-blue" />
+                  <p className="text-sm text-text-secondary">
+                    Analyzing clinical documentation...
+                  </p>
+                </div>
+              )}
+
+              {/* ---- Error state ---- */}
+              {error && !isLoading && (
+                <div className="flex flex-col items-center gap-3 p-4 rounded-lg bg-status-red/5 border border-status-red/15">
+                  <AlertCircle size={28} className="text-status-red" />
+                  <p className="text-sm text-status-red text-center max-w-xs">{error}</p>
+                  <button
+                    onClick={handleRunAudit}
+                    disabled={!canRunAudit}
+                    className="px-4 py-1.5 rounded-lg text-xs font-medium
+                               bg-status-red/10 text-status-red
+                               hover:bg-status-red/20 transition-colors
+                               disabled:opacity-30"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              {/* ---- Empty state (no evaluation yet) ---- */}
+              {!evalResult && !isLoading && !error && (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
                   <div className="mb-4 p-4 rounded-full bg-accent-gold/5 border border-accent-gold/10">
                     <BarChart3 size={40} className="text-accent-gold/30" />
                   </div>
                   <p className="text-sm text-text-secondary/60 max-w-xs">
-                    Select a sample case or enter clinical notes to see the approval likelihood score.
+                    Select a sample case and click <strong>Run Audit</strong> to see the
+                    approval likelihood score.
                   </p>
                 </div>
               )}
 
-              {/* Criteria Checklist */}
-              <CriteriaChecklist
-                satisfiedCriteria={satisfiedCriteria}
-                missingCriteria={missingCriteria}
-              />
+              {/* ---- Results ---- */}
+              {evalResult && !isLoading && (
+                <>
+                  {/* Score Gauge */}
+                  <ScoreGauge score={score} riskLevel={riskLevel} />
 
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-3">
-                {/* View Policy Button */}
-                <button
-                  onClick={() => setIsPolicyOpen(true)}
-                  disabled={!policy}
-                  className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg
-                             border border-accent-blue/30 text-accent-blue text-xs font-medium
-                             hover:bg-accent-blue/10 transition-all duration-200
-                             disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  <BookOpen size={14} />
-                  View Active LCD/NCD Policy
-                </button>
+                  {/* Criteria Checklist */}
+                  <CriteriaChecklist
+                    satisfiedCriteria={satisfiedCriteria}
+                    missingCriteria={missingCriteria}
+                  />
 
-                {/* Generate Packet Button */}
-                <button
-                  onClick={() => setIsPacketOpen(true)}
-                  disabled={!letter}
-                  className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg
-                             bg-gradient-to-r from-accent-blue/20 to-accent-blue/5
-                             border border-accent-blue/40 text-accent-blue text-xs font-medium
-                             hover:from-accent-blue/30 hover:to-accent-blue/10
-                             transition-all duration-200
-                             disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  <FileText size={14} />
-                  Generate Appeal Packet
-                </button>
-              </div>
+                  {/* Action Buttons */}
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button
+                      onClick={() => setIsPolicyOpen(true)}
+                      disabled={!policy}
+                      className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg
+                                 border border-accent-blue/30 text-accent-blue text-xs font-medium
+                                 hover:bg-accent-blue/10 transition-all duration-200
+                                 disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <BookOpen size={14} />
+                      View Active LCD/NCD Policy
+                    </button>
+
+                    <button
+                      onClick={() => setIsPacketOpen(true)}
+                      disabled={!letter}
+                      className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg
+                                 bg-gradient-to-r from-accent-blue/20 to-accent-blue/5
+                                 border border-accent-blue/40 text-accent-blue text-xs font-medium
+                                 hover:from-accent-blue/30 hover:to-accent-blue/10
+                                 transition-all duration-200
+                                 disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <FileText size={14} />
+                      Generate Appeal Packet
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

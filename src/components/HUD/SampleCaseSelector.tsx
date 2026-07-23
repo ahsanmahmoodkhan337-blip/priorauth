@@ -3,33 +3,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Stethoscope, ChevronDown } from 'lucide-react';
+import { SAMPLE_CASES, type SampleCaseData } from '@/lib/sampleCases';
 
-interface SampleCase {
-  id: string;
-  label: string;
-  riskLevel: 'high-denial' | 'moderate' | 'high-approval';
-}
+// ---- Config types reused across the HUD ----
 
-const SAMPLE_CASES: SampleCase[] = [
-  {
-    id: 'lumbar-mri',
-    label: 'Case 1: Lumbar Spine MRI (CPT 72148) — Aetna',
-    riskLevel: 'high-denial',
-  },
-  {
-    id: 'knee-arthroplasty',
-    label: 'Case 2: Total Knee Arthroplasty (CPT 27447) — BCBS',
-    riskLevel: 'moderate',
-  },
-  {
-    id: 'cardiac-echo',
-    label: 'Case 3: Cardiac Echocardiogram (CPT 93306) — Medicare MAC',
-    riskLevel: 'high-approval',
-  },
-];
+export type SampleCaseRisk = 'high-denial' | 'moderate' | 'high-approval';
 
 const RISK_CONFIG: Record<
-  SampleCase['riskLevel'],
+  SampleCaseRisk,
   { label: string; bg: string; text: string; dot: string }
 > = {
   'high-denial': {
@@ -52,13 +33,20 @@ const RISK_CONFIG: Record<
   },
 };
 
+// ---- Component ----
+
 interface SampleCaseSelectorProps {
-  onSelectCase: (caseId: string) => void;
+  /**
+   * Called when the user picks a pre-loaded case.
+   * The parent receives the full SampleCaseData so it can auto-populate
+   * the editor _and_ remember the payer/CPT pair.
+   */
+  onSelectCase: (caseData: SampleCaseData) => void;
 }
 
 export default function SampleCaseSelector({ onSelectCase }: SampleCaseSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedCase, setSelectedCase] = useState<SampleCase | null>(null);
+  const [selectedCase, setSelectedCase] = useState<SampleCaseData | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -71,10 +59,10 @@ export default function SampleCaseSelector({ onSelectCase }: SampleCaseSelectorP
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  function handleSelect(c: SampleCase) {
+  function handleSelect(c: SampleCaseData) {
     setSelectedCase(c);
     setIsOpen(false);
-    onSelectCase(c.id);
+    onSelectCase(c);
   }
 
   return (
@@ -94,14 +82,22 @@ export default function SampleCaseSelector({ onSelectCase }: SampleCaseSelectorP
                 {selectedCase.label}
               </p>
               <span
-                className={`inline-flex items-center gap-1.5 mt-0.5 text-[10px] font-medium px-2 py-0.5 rounded-full ${RISK_CONFIG[selectedCase.riskLevel].bg} ${RISK_CONFIG[selectedCase.riskLevel].text}`}
+                className={`inline-flex items-center gap-1.5 mt-0.5 text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                  RISK_CONFIG[selectedCase.riskLevel].bg
+                } ${RISK_CONFIG[selectedCase.riskLevel].text}`}
               >
-                <span className={`w-1.5 h-1.5 rounded-full ${RISK_CONFIG[selectedCase.riskLevel].dot}`} />
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    RISK_CONFIG[selectedCase.riskLevel].dot
+                  }`}
+                />
                 {RISK_CONFIG[selectedCase.riskLevel].label}
               </span>
             </>
           ) : (
-            <p className="text-sm text-text-secondary">Select a pre-loaded sample case...</p>
+            <p className="text-sm text-text-secondary">
+              Select a pre-loaded sample case...
+            </p>
           )}
         </div>
         <motion.div
@@ -109,7 +105,10 @@ export default function SampleCaseSelector({ onSelectCase }: SampleCaseSelectorP
           transition={{ duration: 0.2 }}
           className="flex-shrink-0"
         >
-          <ChevronDown size={16} className="text-text-secondary group-hover:text-accent-blue transition-colors" />
+          <ChevronDown
+            size={16}
+            className="text-text-secondary group-hover:text-accent-blue transition-colors"
+          />
         </motion.div>
       </button>
 
@@ -126,12 +125,12 @@ export default function SampleCaseSelector({ onSelectCase }: SampleCaseSelectorP
               const risk = RISK_CONFIG[c.riskLevel];
               return (
                 <button
-                  key={c.id}
+                  key={c.caseId}
                   onClick={() => handleSelect(c)}
                   className={`w-full px-4 py-3 flex items-center gap-3 text-left
                               hover:bg-accent-blue/5 transition-colors duration-150
                               border-b border-border-light last:border-b-0
-                              ${selectedCase?.id === c.id ? 'bg-accent-blue/5' : ''}`}
+                              ${selectedCase?.caseId === c.caseId ? 'bg-accent-blue/5' : ''}`}
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-text-primary truncate">{c.label}</p>
@@ -151,3 +150,9 @@ export default function SampleCaseSelector({ onSelectCase }: SampleCaseSelectorP
     </div>
   );
 }
+
+/**
+ * Re-export SampleCaseData so parent components can use the type
+ * without importing from @/lib/sampleCases directly.
+ */
+export type { SampleCaseData };
