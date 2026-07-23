@@ -21,6 +21,7 @@ import {
   AlertTriangle,
   ShieldCheck,
   ThumbsUp,
+  Cpu,
 } from 'lucide-react';
 import { useCaseState } from '@/lib/useCaseState';
 
@@ -33,6 +34,7 @@ interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: Date;
+  aiPowered?: boolean;
 }
 
 interface SuggestionChip {
@@ -361,7 +363,7 @@ export default function DeepAICopilot() {
   }, [isOpen]);
 
   const handleSend = useCallback(
-    (text?: string) => {
+    async (text?: string) => {
       const query = (text || inputValue).trim();
       if (!query || isTyping) return;
 
@@ -376,12 +378,51 @@ export default function DeepAICopilot() {
       setInputValue('');
       setIsTyping(true);
 
-      const delay = 800 + Math.random() * 800;
-      setTimeout(() => {
-        // First try case-specific response
-        let response: string | null = null;
+      // ---- Try OpenRouter AI first ----
+      let aiContent: string | null = null;
+
+      try {
+        const ctxPayload = activeCase
+          ? {
+              payerName,
+              cptCode,
+              procedureName,
+              chartNote: activeCase.chartNote?.substring(0, 500) || '',
+              approvalScore,
+              riskLevel,
+              satisfiedCriteria: satisfiedCriteria.slice(0, 10).map((c) => ({ description: c.description })),
+              missingCriteria: missingCriteria.slice(0, 10).map((c) => ({ description: c.description, recommendedAction: c.recommendedAction })),
+            }
+          : undefined;
+
+        const res = await fetch('/api/copilot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query, context: ctxPayload }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.ai && data.content) {
+            aiContent = data.content;
+          }
+        }
+      } catch {
+        // Network error — will fall back to rule-based
+      }
+
+      // ---- Build response: AI first, then fall back ----
+      let response: string;
+      let aiPowered = false;
+
+      if (aiContent) {
+        response = aiContent;
+        aiPowered = true;
+      } else {
+        // Fall back to rule-based responses
+        let ruleBased: string | null = null;
         if (activeCase) {
-          response = generateCaseSpecificResponse(
+          ruleBased = generateCaseSpecificResponse(
             query,
             payerName,
             cptCode,
@@ -393,30 +434,27 @@ export default function DeepAICopilot() {
             hasResult
           );
         }
+        response = ruleBased || getBasicSimulatedResponse(query);
 
-        // Fall back to basic simulated response
-        if (!response) {
-          response = getBasicSimulatedResponse(query);
-        }
-
-        // Handle action hooks
+        // Handle action hooks for rule-based responses
         const isAction =
           query.toLowerCase().includes('insert') ||
           query.toLowerCase().includes('deepai');
         if (isAction && query.toLowerCase().includes('insert')) {
           showToast('✅ Action: Citation inserted into Section 2');
         }
+      }
 
-        const aiMsg: Message = {
-          id: Date.now() + 1,
-          role: 'assistant',
-          content: response,
-          timestamp: new Date(),
-        };
+      const aiMsg: Message = {
+        id: Date.now() + 1,
+        role: 'assistant',
+        content: response,
+        timestamp: new Date(),
+        aiPowered,
+      };
 
-        setMessages((prev) => [...prev, aiMsg]);
-        setIsTyping(false);
-      }, delay);
+      setMessages((prev) => [...prev, aiMsg]);
+      setIsTyping(false);
     },
     [inputValue, isTyping, activeCase, payerName, cptCode, procedureName, approvalScore, riskLevel, satisfiedCriteria, missingCriteria, hasResult]
   );
@@ -652,7 +690,7 @@ export default function DeepAICopilot() {
                       {/* Bubble */}
                       <div className={`max-w-[85%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                         <div
-                          className={`px-3 py-2 rounded-xl text-xs leading-relaxed whitespace-pre-wrap ${
+                          className={`px-3 py-2 rounded-xl text-xs leading-relaxed whitespace-pre-wrap relative ${
                             msg.role === 'assistant'
                               ? 'bg-white border border-border-light text-text-primary rounded-tl-sm'
                               : msg.role === 'system'
@@ -661,6 +699,14 @@ export default function DeepAICopilot() {
                           }`}
                         >
                           {msg.content}
+                          {/* AI badge for AI-powered responses */}
+                          {msg.aiPowered && (
+                            <span className="absolute -top-2 -right-2 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold shadow-sm"
+                              style={{ background: 'linear-gradient(135deg, #00E5FF, #1E5CD4)', color: '#fff' }}>
+                              <Cpu size={9} />
+                              AI
+                            </span>
+                          )}
                         </div>
                         <span className="text-[9px] text-text-secondary/50 mt-0.5 block px-1">
                           {formatTime(msg.timestamp)}
@@ -750,7 +796,7 @@ export default function DeepAICopilot() {
                     </button>
                   </div>
                   <p className="text-[9px] text-text-secondary/40 mt-1.5 text-center">
-                    Press Enter to send • Ctrl+Space to toggle • MedHero DeepAI v3.0 (Case-Aware)
+                    Press Enter to send • Ctrl+Space to toggle • MedHero DeepAI v3.0 (AI-Powered)
                   </p>
                 </div>
               </>

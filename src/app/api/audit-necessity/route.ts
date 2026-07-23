@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPolicy, getGenericPolicy } from '@/lib/policies';
 import { evaluateChart } from '@/lib/evaluationEngine';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
+import { callOpenRouter, isOpenRouterConfigured } from '@/lib/openrouter';
 
 /**
  * POST /api/audit-necessity
@@ -80,6 +81,55 @@ export async function POST(request: NextRequest) {
     // ---- Run evaluation ----
     const result = evaluateChart(chartNote.trim(), policy);
 
+    // ---- AI-powered analysis (if OpenRouter key is configured) ----
+    let aiAnalysis: string | null = null;
+    let aiUsed = false;
+
+    if (isOpenRouterConfigured()) {
+      const aiPrompt = buildAuditPrompt(chartNote.trim(), payerName, cptCode, policy.procedureName, result);
+      const aiSystemPrompt = `You are a medical prior authorization auditor for Healthcare Hustlers. 
+Review the chart note against payer coverage criteria and provide a structured assessment.
+Return your analysis in this EXACT format:
+
+APPROVAL_SCORE: [number between 0-100]
+RISK_LEVEL: [Low/Medium/High]
+CRITERIA_ASSESSMENT: [brief paragraph about which criteria are met vs missing]
+MISSING_ITEMS: [bullet list of specific missing documentation or gaps]
+RECOMMENDATION: [1-2 sentence actionable recommendation]
+
+Keep the entire response under 300 words. Be specific and cite details from the chart note.`;
+
+      try {
+        const aiResponse = await callOpenRouter(aiPrompt, aiSystemPrompt, {
+          maxTokens: 500,
+          temperature: 0.2,
+        });
+
+        if (aiResponse) {
+          aiAnalysis = aiResponse;
+          aiUsed = true;
+
+          // Attempt to parse AI approval score to augment rule-based result
+          const scoreMatch = aiResponse.match(/APPROVAL_SCORE:\s*(\d+)/i);
+          if (scoreMatch) {
+            const aiScore = parseInt(scoreMatch[1], 10);
+            if (!isNaN(aiScore) && aiScore >= 0 && aiScore <= 100) {
+              // Blend: 60% rule-based, 40% AI
+              const blendedScore = Math.round(result.approvalScore * 0.6 + aiScore * 0.4);
+              result.approvalScore = blendedScore;
+
+              // Recalculate risk level
+              if (blendedScore >= 80) result.riskLevel = 'Low';
+              else if (blendedScore >= 50) result.riskLevel = 'Medium';
+              else result.riskLevel = 'High';
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[audit-necessity] AI analysis failed, using rule-based only:', err);
+      }
+    }
+
     // ---- Save audit result to Supabase (non-blocking fire-and-forget) ----
     if (isSupabaseConfigured()) {
       const client = getSupabase();
@@ -105,7 +155,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(result, { status: 200 });
+    return NextResponse.json({
+      ...result,
+      aiAnalysis,
+      aiUsed,
+    }, { status: 200 });
   } catch (err) {
     console.error('[audit-necessity] Unexpected error:', err);
     return NextResponse.json(
@@ -113,4 +167,41 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+/**
+ * Build the user prompt for the OpenRouter AI audit call.
+ */
+function buildAuditPrompt(
+  chartNote: string,
+  payerName: string,
+  cptCode: string,
+  procedureName: string,
+  ruleBasedResult: {
+    approvalScore: number;
+    riskLevel: string;
+    satisfiedCriteria: { description: string; chartCitation: string }[];
+    missingCriteria: { description: string; recommendedAction: string }[];
+  }
+): string {
+  return `PRIOR AUTHORIZATION AUDIT REQUEST
+
+PAYER: ${payerName}
+CPT CODE: ${cptCode}
+PROCEDURE: ${procedureName}
+
+RULE-BASED RESULT: ${ruleBasedResult.approvalScore}% (${ruleBasedResult.riskLevel} risk)
+
+SATISFIED CRITERIA:
+${ruleBasedResult.satisfiedCriteria.map((c) => `- ${c.description} [citation: ${c.chartCitation}]`).join('\n') || '(none)'}
+
+MISSING CRITERIA:
+${ruleBasedResult.missingCriteria.map((c) => `- ${c.description} → ${c.recommendedAction}`).join('\n') || '(none)'}
+
+CHART NOTE:
+"""
+${chartNote}
+"""
+
+Please provide your expert assessment of this prior authorization request. Consider the payer's typical coverage criteria, the clinical documentation provided, and the rule-based engine's findings. Return your analysis in the requested format.`;
 }
