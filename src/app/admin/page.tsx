@@ -163,7 +163,7 @@ export default function AdminPage() {
           setDurationDays(7);
           setCustomDays('');
 
-          const expiryDate = new Date(data.request.expiresAt).toLocaleDateString('en-US', {
+          const expiryDate = new Date(data.expiresAt).toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'long',
             day: 'numeric',
